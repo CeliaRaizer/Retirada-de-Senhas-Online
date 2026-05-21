@@ -3,40 +3,32 @@ const router = express.Router();
 
 const controller = require("../controllers/senhaController");
 
-// middleware cliente logado
 const auth = require("../middlewares/authMiddleware");
-
-// middleware admin
 const admin = require("../middlewares/adminMiddleware");
 
-/* ==========================================
-   CLIENTE
-========================================== */
+const configController = require("../controllers/configController");
 
-// retirar senha (cliente logado Google)
+/* ===================== CLIENTE ===================== */
 router.post("/senha", auth, controller.criar);
-
-
-/* ==========================================
-   ADMIN
-========================================== */
-
-// listar todas senhas
-router.get("/senhas", admin, controller.listar);
-
-// chamar próxima
-router.put("/senha/chamar", admin, controller.chamar);
-
-// finalizar senha
-router.put("/senha/finalizar/:id", admin, controller.finalizar);
-
-// cancelar senha
-router.put("/senha/cancelar/:id", admin, controller.cancelar);
-
-// ver posição na fila
 router.get("/minha-senha", auth, controller.minhaSenha);
-
-// cancelar minha senha
 router.put("/minha-senha/cancelar", auth, controller.cancelarMinhaSenha);
+
+/* ===================== ADMIN ===================== */
+router.get("/senhas", admin, controller.listar);
+router.put("/senha/chamar", admin, controller.chamar);
+router.put("/senha/finalizar/:id", admin, controller.finalizar);
+router.put("/senha/cancelar/:id", admin, controller.cancelar);
+router.put("/senhas/resetar", admin, controller.resetarFila);
+
+// ←←←←← ESSA LINHA É A MAIS IMPORTANTE AGORA:
+router.get("/historico", admin, controller.historicoPorData);
+
+/* ===================== PÚBLICO ===================== */
+router.get("/fila", controller.filaPublica);
+
+
+
+router.get("/config/tempo",        admin, configController.getTempo);
+router.put("/config/tempo",        admin, configController.setTempo);
 
 module.exports = router;

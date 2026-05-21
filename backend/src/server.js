@@ -36,9 +36,20 @@ app.set("io", io);
 /* =====================================
    PORTA
 ===================================== */
+
+/* =====================================
+   TRATAMENTO DE ERROS GLOBAL
+===================================== */
+process.on("uncaughtException", (err) => {
+    console.error("Erro não capturado:", err.message);
+});
+
+process.on("unhandledRejection", (err) => {
+    console.error("Promise rejeitada:", err?.message || err);
+});
+
 const PORT = 3000;
 
 server.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
-
