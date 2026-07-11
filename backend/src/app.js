@@ -14,9 +14,11 @@ app.get("/", (req, res) => {
 
 // importar rotas
 const senhaRoutes = require("./routes/senhaRoutes");
+const atendenteRoutes = require("./routes/atendenteRoutes");
 
 // usar rotas
 app.use("/api", senhaRoutes);
+app.use("/api/atendentes", atendenteRoutes);
 
 
 app.use(express.static("public"));

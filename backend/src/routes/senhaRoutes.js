@@ -5,6 +5,7 @@ const controller = require("../controllers/senhaController");
 
 const auth = require("../middlewares/authMiddleware");
 const admin = require("../middlewares/adminMiddleware");
+const staff = require("../middlewares/adminOuAtendenteMiddleware");
 
 const configController = require("../controllers/configController");
 
@@ -13,14 +14,14 @@ router.post("/senha", auth, controller.criar);
 router.get("/minha-senha", auth, controller.minhaSenha);
 router.put("/minha-senha/cancelar", auth, controller.cancelarMinhaSenha);
 
-/* ===================== ADMIN ===================== */
-router.get("/senhas", admin, controller.listar);
-router.put("/senha/chamar", admin, controller.chamar);
-router.put("/senha/finalizar/:id", admin, controller.finalizar);
-router.put("/senha/cancelar/:id", admin, controller.cancelar);
-router.put("/senhas/resetar", admin, controller.resetarFila);
+/* ============ OPERAÇÃO DA FILA (admin ou atendente) ============ */
+router.get("/senhas", staff, controller.listar);
+router.put("/senha/chamar", staff, controller.chamar);
+router.put("/senha/finalizar/:id", staff, controller.finalizar);
+router.put("/senha/cancelar/:id", staff, controller.cancelar);
 
-// ←←←←← ESSA LINHA É A MAIS IMPORTANTE AGORA:
+/* ===================== SOMENTE ADMIN ===================== */
+router.put("/senhas/resetar", admin, controller.resetarFila);
 router.get("/historico", admin, controller.historicoPorData);
 
 /* ===================== PÚBLICO ===================== */

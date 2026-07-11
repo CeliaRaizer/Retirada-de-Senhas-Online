@@ -1,6 +1,7 @@
 const jwt    = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const db     = require("../config/db");
+const atendenteModel = require("../models/atendenteModel");
 
 /* =====================================
    LOGIN GOOGLE (OAuth)
@@ -82,4 +83,57 @@ exports.loginAdmin = async (req, res) => {
             token
         });
     });
+};
+
+/* =====================================
+   LOGIN ATENDENTE (email + senha com bcrypt)
+===================================== */
+exports.loginAtendente = async (req, res) => {
+
+    const { email, senha } = req.body;
+
+    if (!email || !senha) {
+        return res.status(400).json({
+            mensagem: "Email e senha são obrigatórios"
+        });
+    }
+
+    try {
+        const atendente = await atendenteModel.buscarPorEmail(email);
+
+        if (!atendente || !atendente.ativo) {
+            return res.status(401).json({
+                mensagem: "Email ou senha inválidos"
+            });
+        }
+
+        const senhaCorreta = await bcrypt.compare(senha, atendente.senha);
+
+        if (!senhaCorreta) {
+            return res.status(401).json({
+                mensagem: "Email ou senha inválidos"
+            });
+        }
+
+        const token = jwt.sign(
+            {
+                id:     atendente.id,
+                nome:   atendente.nome,
+                email:  atendente.email,
+                perfil: "atendente"
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "8h" }
+        );
+
+        return res.json({
+            mensagem: "Login atendente realizado",
+            token
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            mensagem: "Erro interno"
+        });
+    }
 };

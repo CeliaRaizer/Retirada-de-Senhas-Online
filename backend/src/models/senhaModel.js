@@ -85,18 +85,25 @@ exports.listarSenhas = () => {
 
 /* ===================================================
    CHAMAR PRÓXIMA (Regra 3x1)
+   - atendenteId: quem está chamando (obrigatório quando logado
+     como atendente; pode vir null em cenários antigos/teste)
 =================================================== */
-exports.chamarProxima = () => {
+exports.chamarProxima = (atendenteId = null) => {
     return new Promise((resolve, reject) => {
 
+        // Finaliza automaticamente APENAS a senha que esse mesmo
+        // atendente estava chamando — não mexe nas senhas de outros
+        // guichês/atendentes. Isso é o que permite múltiplos atendentes
+        // operando a fila ao mesmo tempo sem um "roubar" o atendimento do outro.
         const sqlFinalizarAnterior = `
             UPDATE senha 
             SET status = 'atendido' 
             WHERE status = 'chamando' 
               AND dia_referencia = CURDATE()
+              AND (atendente_id <=> ?)
         `;
 
-        db.query(sqlFinalizarAnterior, (err) => {
+        db.query(sqlFinalizarAnterior, [atendenteId], (err) => {
             if (err) return reject(err);
 
             let sqlBusca = "";
@@ -131,16 +138,21 @@ exports.chamarProxima = () => {
 
                 const senha = result[0];
 
-                db.query(`UPDATE senha SET status = 'chamando' WHERE id = ?`, [senha.id], (err) => {
-                    if (err) return reject(err);
+                db.query(
+                    `UPDATE senha SET status = 'chamando', atendente_id = ? WHERE id = ?`,
+                    [atendenteId, senha.id],
+                    (err) => {
+                        if (err) return reject(err);
 
-                    senha.status = "chamando";
+                        senha.status = "chamando";
+                        senha.atendente_id = atendenteId;
 
-                    if (senha.tipo === "prioritario") contadorPrioritarias++;
-                    else contadorPrioritarias = 0;
+                        if (senha.tipo === "prioritario") contadorPrioritarias++;
+                        else contadorPrioritarias = 0;
 
-                    resolve(senha);
-                });
+                        resolve(senha);
+                    }
+                );
             });
         });
     });

@@ -45,7 +45,8 @@ exports.listar = async (req, res) => {
 ===================================== */
 exports.chamar = async (req, res) => {
     try {
-        const senha = await model.chamarProxima();
+        const atendenteId = req.usuario?.perfil === "atendente" ? req.usuario.id : null;
+        const senha = await model.chamarProxima(atendenteId);
 
         const io = req.app.get("io");
         io.emit("senhaChamada", senha);
