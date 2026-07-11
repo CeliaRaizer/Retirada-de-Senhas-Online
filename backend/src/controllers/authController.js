@@ -2,19 +2,49 @@ const jwt    = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const db     = require("../config/db");
 const atendenteModel = require("../models/atendenteModel");
+const clienteModel = require("../models/clienteModel");
 
 /* =====================================
    LOGIN GOOGLE (OAuth)
 ===================================== */
-exports.callback = (req, res) => {
+exports.callback = async (req, res) => {
 
-    const token = jwt.sign(
-        req.user,
-        process.env.JWT_SECRET,
-        { expiresIn: "1d" }
-    );
+    try {
+        const { googleId, nome, email } = req.user;
 
-    res.redirect(`http://localhost:5173?token=${token}`);
+        let cliente = await clienteModel.buscarPorGoogleId(googleId);
+
+        if (!cliente) {
+            // Talvez a pessoa já tenha uma conta local (email+senha)
+            // com esse mesmo email — nesse caso vinculamos o Google
+            // a ela em vez de criar uma conta duplicada.
+            const existentePorEmail = await clienteModel.buscarPorEmail(email);
+
+            if (existentePorEmail) {
+                await clienteModel.vincularGoogleId(existentePorEmail.id, googleId);
+                cliente = existentePorEmail;
+            } else {
+                cliente = await clienteModel.criarClienteGoogle(nome, email, googleId);
+            }
+        }
+
+        const token = jwt.sign(
+            {
+                id:     cliente.id,
+                nome:   cliente.nome,
+                email:  cliente.email,
+                perfil: "cliente"
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "1d" }
+        );
+
+        res.redirect(`http://localhost:5173?token=${token}`);
+
+    } catch (err) {
+        console.error("Erro no login Google:", err);
+        res.redirect(`http://localhost:5173?erro=login_google_falhou`);
+    }
 };
 
 /* =====================================
@@ -101,6 +131,8 @@ exports.loginAtendente = async (req, res) => {
     try {
         const atendente = await atendenteModel.buscarPorEmail(email);
 
+        // mesmo erro para email inválido, senha errada ou conta desativada
+        // (evita enumerar usuários)
         if (!atendente || !atendente.ativo) {
             return res.status(401).json({
                 mensagem: "Email ou senha inválidos"
@@ -132,6 +164,111 @@ exports.loginAtendente = async (req, res) => {
         });
 
     } catch (err) {
+        return res.status(500).json({
+            mensagem: "Erro interno"
+        });
+    }
+};
+
+/* =====================================
+   CADASTRO DE CLIENTE (conta local)
+===================================== */
+exports.registrarCliente = async (req, res) => {
+
+    const { nome, email, senha } = req.body;
+
+    if (!nome || !email || !senha) {
+        return res.status(400).json({
+            mensagem: "Nome, email e senha são obrigatórios"
+        });
+    }
+
+    try {
+        const existente = await clienteModel.buscarPorEmail(email);
+
+        if (existente) {
+            return res.status(409).json({
+                mensagem: "Já existe uma conta com esse email"
+            });
+        }
+
+        const senhaHash = await bcrypt.hash(senha, 12);
+        const cliente = await clienteModel.criarCliente(nome, email, senhaHash);
+
+        const token = jwt.sign(
+            {
+                id:     cliente.id,
+                nome:   cliente.nome,
+                email:  cliente.email,
+                perfil: "cliente"
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "1d" }
+        );
+
+        return res.status(201).json({
+            mensagem: "Conta criada com sucesso",
+            token
+        });
+
+    } catch (err) {
+        console.error("Erro ao registrar cliente:", err);
+        return res.status(500).json({
+            mensagem: "Erro interno"
+        });
+    }
+};
+
+/* =====================================
+   LOGIN DE CLIENTE (conta local)
+===================================== */
+exports.loginCliente = async (req, res) => {
+
+    const { email, senha } = req.body;
+
+    if (!email || !senha) {
+        return res.status(400).json({
+            mensagem: "Email e senha são obrigatórios"
+        });
+    }
+
+    try {
+        const cliente = await clienteModel.buscarPorEmail(email);
+
+        // mesmo erro para email inválido, senha errada ou conta só-Google
+        // (evita enumerar usuários e evita expor que a conta usa Google)
+        if (!cliente || !cliente.senha) {
+            return res.status(401).json({
+                mensagem: "Email ou senha inválidos"
+            });
+        }
+
+        const senhaCorreta = await bcrypt.compare(senha, cliente.senha);
+
+        if (!senhaCorreta) {
+            return res.status(401).json({
+                mensagem: "Email ou senha inválidos"
+            });
+        }
+
+        const token = jwt.sign(
+            {
+                id:     cliente.id,
+                nome:   cliente.nome,
+                email:  cliente.email,
+                perfil: "cliente"
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "1d" }
+        );
+
+        return res.json({
+            mensagem: "Login realizado",
+            token
+        });
+
+    } catch (err) {
+        console.error("Erro ao logar cliente:", err);
         return res.status(500).json({
             mensagem: "Erro interno"
         });
