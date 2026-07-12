@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const configModel = require("./configModel");
+const crypto = require("crypto");
 
 let contadorPrioritarias = 0;
 
@@ -67,8 +68,172 @@ exports.criarSenha = (tipo, email) => {
 };
 
 /* ===================================================
-   LISTAR SENHAS (painel admin — dia de trabalho atual)
+   CRIAR SENHA ANÔNIMA (sem login)
+   Gera um código de acesso pra pessoa conseguir
+   consultar o status depois, sem precisar de conta.
 =================================================== */
+function gerarCodigoAcesso() {
+    // 6 caracteres, letras maiúsculas + números (ex: "A3F9K1")
+    return crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 6);
+}
+
+exports.criarSenhaAnonima = (tipo, dispositivoId) => {
+    return new Promise((resolve, reject) => {
+        const prefixo = tipo === "prioritario" ? "P" : "N";
+        const codigoAcesso = gerarCodigoAcesso();
+
+        db.getConnection((err, connection) => {
+            if (err) return reject(err);
+
+            connection.beginTransaction(err => {
+                if (err) { connection.release(); return reject(err); }
+
+                // Checa, dentro da MESMA transação, se esse dispositivo já
+                // tem uma senha ativa hoje. O FOR UPDATE trava a checagem
+                // até a transação terminar, então duas requisições quase
+                // simultâneas do mesmo dispositivo não conseguem "passar
+                // pela brecha" e criar duas senhas ao mesmo tempo.
+                const sqlDispositivo = `
+                    SELECT id, numero, tipo, status, codigo_acesso
+                    FROM senha
+                    WHERE dispositivo_id = ?
+                      AND dia_referencia = CURDATE()
+                      AND status IN ('esperando', 'chamando')
+                    LIMIT 1
+                    FOR UPDATE
+                `;
+
+                connection.query(sqlDispositivo, [dispositivoId], (err, senhasAtivas) => {
+                    if (err) {
+                        return connection.rollback(() => { connection.release(); reject(err); });
+                    }
+
+                    if (senhasAtivas.length > 0) {
+                        const existente = senhasAtivas[0];
+                        return connection.rollback(() => {
+                            connection.release();
+                            resolve({
+                                jaExiste: true,
+                                senha: {
+                                    id: existente.id,
+                                    numero: existente.numero,
+                                    tipo: existente.tipo,
+                                    status: existente.status,
+                                    codigoAcesso: existente.codigo_acesso
+                                }
+                            });
+                        });
+                    }
+
+                    const sqlUltima = `
+                        SELECT numero FROM senha 
+                        WHERE tipo = ? 
+                          AND dia_referencia = CURDATE()
+                        ORDER BY id DESC LIMIT 1
+                        FOR UPDATE
+                    `;
+
+                    connection.query(sqlUltima, [tipo], (err, result) => {
+                        if (err) {
+                            return connection.rollback(() => { connection.release(); reject(err); });
+                        }
+
+                        let proximo = 1;
+                        if (result.length > 0 && result[0].numero) {
+                            proximo = parseInt(result[0].numero.substring(1)) + 1;
+                        }
+
+                        const numeroFormatado = prefixo + String(proximo).padStart(3, "0");
+
+                        const sqlInsert = `
+                            INSERT INTO senha 
+                            (numero, tipo, status, data, dia_referencia, codigo_acesso, dispositivo_id)
+                            VALUES (?, ?, 'esperando', CURDATE(), CURDATE(), ?, ?)
+                        `;
+
+                        connection.query(sqlInsert, [numeroFormatado, tipo, codigoAcesso, dispositivoId], (err, insertResult) => {
+                            if (err) {
+                                return connection.rollback(() => { connection.release(); reject(err); });
+                            }
+
+                            connection.commit(err => {
+                                connection.release();
+                                if (err) return reject(err);
+
+                                resolve({
+                                    jaExiste: false,
+                                    senha: {
+                                        id: insertResult.insertId,
+                                        numero: numeroFormatado,
+                                        tipo,
+                                        status: "esperando",
+                                        codigoAcesso
+                                    }
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+};
+
+/* ===================================================
+   CONSULTAR STATUS POR CÓDIGO (sem login)
+=================================================== */
+exports.buscarPorCodigo = (numero, codigoAcesso) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const [result] = await db.promise().query(`
+                SELECT * FROM senha
+                WHERE numero = ?
+                  AND codigo_acesso = ?
+                  AND dia_referencia = CURDATE()
+                LIMIT 1
+            `, [numero, codigoAcesso]);
+
+            if (result.length === 0) {
+                return resolve(null);
+            }
+
+            const minha = result[0];
+
+            let pessoasNaFrente = 0;
+
+            if (minha.status === "esperando") {
+                if (minha.tipo === "prioritario") {
+                    const [priorResult] = await db.promise().query(`
+                        SELECT COUNT(*) as total FROM senha
+                        WHERE status = 'esperando'
+                          AND dia_referencia = CURDATE()
+                          AND tipo = 'prioritario'
+                          AND id < ?
+                    `, [minha.id]);
+                    pessoasNaFrente = priorResult[0].total;
+                } else {
+                    const [normalResult] = await db.promise().query(`
+                        SELECT COUNT(*) as total FROM senha
+                        WHERE status = 'esperando'
+                          AND dia_referencia = CURDATE()
+                          AND (tipo = 'prioritario' OR (tipo = 'normal' AND id < ?))
+                    `, [minha.id]);
+                    pessoasNaFrente = normalResult[0].total;
+                }
+            }
+
+            const tempoPorPessoa = await configModel.getTempo();
+            const tempoEstimadoMinutos = pessoasNaFrente * tempoPorPessoa;
+
+            resolve({ ...minha, pessoasNaFrente, tempoEstimadoMinutos });
+
+        } catch (err) {
+            reject(err);
+        }
+    });
+};
+
+
 exports.listarSenhas = () => {
     return new Promise((resolve, reject) => {
         const sql = `

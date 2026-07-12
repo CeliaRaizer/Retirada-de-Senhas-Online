@@ -28,6 +28,75 @@ exports.criar = async (req, res) => {
 };
 
 /* =====================================
+   CRIAR SENHA ANÔNIMA (sem login)
+===================================== */
+exports.criarAnonima = async (req, res) => {
+    try {
+        const { tipo, dispositivoId } = req.body;
+
+        if (!tipo || !["normal", "prioritario"].includes(tipo)) {
+            return res.status(400).json({ erro: "Tipo de senha inválido" });
+        }
+
+        if (!dispositivoId || typeof dispositivoId !== "string") {
+            return res.status(400).json({ erro: "dispositivoId é obrigatório" });
+        }
+
+        const resultado = await model.criarSenhaAnonima(tipo, dispositivoId);
+
+        if (resultado.jaExiste) {
+            return res.status(409).json({
+                mensagem: "Este dispositivo já possui uma senha ativa",
+                senha: resultado.senha
+            });
+        }
+
+        const io = req.app.get("io");
+        io.emit("filaAtualizada");
+
+        return res.status(201).json(resultado.senha);
+
+    } catch (err) {
+        console.error("Erro ao criar senha anônima:", err);
+        return res.status(500).json({
+            erro: err.message || "Erro ao criar senha"
+        });
+    }
+};
+
+/* =====================================
+   CONSULTAR STATUS POR CÓDIGO (sem login)
+===================================== */
+exports.statusPorCodigo = async (req, res) => {
+    try {
+        const { numero, codigo } = req.query;
+
+        if (!numero || !codigo) {
+            return res.status(400).json({
+                mensagem: "Informe numero e codigo"
+            });
+        }
+
+        const senha = await model.buscarPorCodigo(numero, codigo.toUpperCase());
+
+        // mesma mensagem para "não existe" e "código errado"
+        // (evita que alguém use tentativa-e-erro pra descobrir
+        // se um número de senha existe)
+        if (!senha) {
+            return res.status(404).json({
+                mensagem: "Senha não encontrada. Confira o número e o código."
+            });
+        }
+
+        return res.json(senha);
+
+    } catch (err) {
+        console.error("Erro ao buscar status por código:", err);
+        return res.status(500).json({ erro: "Erro ao consultar status" });
+    }
+};
+
+/* =====================================
    LISTAR TODAS (dia atual)
 ===================================== */
 exports.listar = async (req, res) => {
