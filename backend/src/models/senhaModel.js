@@ -10,6 +10,7 @@ let contadorPrioritarias = 0;
 exports.criarSenha = (tipo, email) => {
     return new Promise((resolve, reject) => {
         const prefixo = tipo === "prioritario" ? "P" : "N";
+        const codigoAcesso = gerarCodigoAcesso();
 
         db.getConnection((err, connection) => {
             if (err) return reject(err);
@@ -39,11 +40,11 @@ exports.criarSenha = (tipo, email) => {
 
                     const sqlInsert = `
                         INSERT INTO senha 
-                        (numero, tipo, status, email_usuario, data, dia_referencia)
-                        VALUES (?, ?, 'esperando', ?, CURDATE(), CURDATE())
+                        (numero, tipo, status, email_usuario, data, dia_referencia, codigo_acesso)
+                        VALUES (?, ?, 'esperando', ?, CURDATE(), CURDATE(), ?)
                     `;
 
-                    connection.query(sqlInsert, [numeroFormatado, tipo, email || null], (err, insertResult) => {
+                    connection.query(sqlInsert, [numeroFormatado, tipo, email || null, codigoAcesso], (err, insertResult) => {
                         if (err) {
                             return connection.rollback(() => { connection.release(); reject(err); });
                         }
@@ -57,7 +58,8 @@ exports.criarSenha = (tipo, email) => {
                                 numero: numeroFormatado,
                                 tipo,
                                 status: "esperando",
-                                email_usuario: email
+                                email_usuario: email,
+                                codigoAcesso
                             });
                         });
                     });
@@ -415,11 +417,57 @@ exports.buscarMinhaSenha = (email) => {
             const tempoPorPessoa = await configModel.getTempo();
             const tempoEstimadoMinutos = pessoasNaFrente * tempoPorPessoa;
 
-            resolve({ ...minha, pessoasNaFrente, tempoEstimadoMinutos });
+            resolve({ ...minha, pessoasNaFrente, tempoEstimadoMinutos, codigoAcesso: minha.codigo_acesso });
 
         } catch (err) {
             reject(err);
         }
+    });
+};
+
+/* ===================================================
+   CANCELAR POR CÓDIGO (visitante sem login)
+=================================================== */
+exports.cancelarPorCodigo = (numero, codigoAcesso) => {
+    return new Promise((resolve, reject) => {
+        const sql = `
+            UPDATE senha 
+            SET status = 'cancelado' 
+            WHERE numero = ? 
+              AND codigo_acesso = ?
+              AND dia_referencia = CURDATE()
+              AND status IN ('esperando', 'chamando')
+        `;
+        db.query(sql, [numero, codigoAcesso], (err, result) => {
+            if (err) return reject(err);
+            resolve({
+                mensagem: result.affectedRows > 0
+                    ? "Senha cancelada com sucesso"
+                    : "Senha não encontrada ou já finalizada"
+            });
+        });
+    });
+};
+
+/* ===================================================
+   HISTÓRICO DO CLIENTE LOGADO
+   Últimos atendimentos (atendido/cancelado) desse email,
+   sem incluir a senha ativa do dia de hoje.
+=================================================== */
+exports.buscarHistoricoCliente = (email) => {
+    return new Promise((resolve, reject) => {
+        const sql = `
+            SELECT id, numero, tipo, status, data
+            FROM senha
+            WHERE email_usuario = ?
+              AND status IN ('atendido', 'cancelado')
+            ORDER BY id DESC
+            LIMIT 20
+        `;
+        db.query(sql, [email], (err, result) => {
+            if (err) return reject(err);
+            resolve(result);
+        });
     });
 };
 

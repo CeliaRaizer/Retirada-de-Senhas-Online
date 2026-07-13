@@ -26,10 +26,12 @@ const limiteSenhaAnonima = rateLimit({
 router.post("/senha", auth, controller.criar);
 router.get("/minha-senha", auth, controller.minhaSenha);
 router.put("/minha-senha/cancelar", auth, controller.cancelarMinhaSenha);
+router.get("/minhas-senhas/historico", auth, controller.meuHistorico);
 
 /* ===================== SEM LOGIN (retirada anônima) ===================== */
 router.post("/senha/anonima", limiteSenhaAnonima, controller.criarAnonima);
 router.get("/senha/status", controller.statusPorCodigo);
+router.put("/senha/anonima/cancelar", controller.cancelarPorCodigo);
 
 /* ============ OPERAÇÃO DA FILA (admin ou atendente) ============ */
 router.get("/senhas", staff, controller.listar);

@@ -97,6 +97,30 @@ exports.statusPorCodigo = async (req, res) => {
 };
 
 /* =====================================
+   CANCELAR POR CÓDIGO (visitante sem login)
+===================================== */
+exports.cancelarPorCodigo = async (req, res) => {
+    try {
+        const { numero, codigo } = req.body;
+
+        if (!numero || !codigo) {
+            return res.status(400).json({ mensagem: "Informe numero e codigo" });
+        }
+
+        const resultado = await model.cancelarPorCodigo(numero, codigo.toUpperCase());
+
+        const io = req.app.get("io");
+        io.emit("filaAtualizada");
+
+        return res.json(resultado);
+
+    } catch (err) {
+        console.error("Erro ao cancelar por código:", err);
+        return res.status(500).json({ erro: "Erro ao cancelar senha" });
+    }
+};
+
+/* =====================================
    LISTAR TODAS (dia atual)
 ===================================== */
 exports.listar = async (req, res) => {
@@ -182,6 +206,22 @@ exports.minhaSenha = async (req, res) => {
     } catch (err) {
         console.error("Erro ao buscar minha senha:", err);
         res.status(500).json({ erro: "Erro ao buscar sua senha" });
+    }
+};
+
+/* =====================================
+   HISTÓRICO DO CLIENTE LOGADO
+===================================== */
+exports.meuHistorico = async (req, res) => {
+    try {
+        const email = req.usuario.email;
+        const historico = await model.buscarHistoricoCliente(email);
+
+        res.json(historico);
+
+    } catch (err) {
+        console.error("Erro ao buscar histórico do cliente:", err);
+        res.status(500).json({ erro: "Erro ao buscar histórico" });
     }
 };
 
