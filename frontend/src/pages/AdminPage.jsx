@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { io } from "socket.io-client";
+import { ModalConfirmar } from "./ClientePage";
 
 const API = "http://localhost:3000";
 
@@ -346,6 +347,336 @@ function ConfigTab({ token }) {
   );
 }
 
+/* ==================== MODAL: CRIAR ATENDENTE ==================== */
+function ModalCriarAtendente({ token, onClose, onCriado }) {
+  const [form, setForm] = useState({ nome: "", email: "", senha: "" });
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const criar = async () => {
+    if (!form.nome || !form.email || !form.senha) {
+      setMsg({ text: "Preencha todos os campos.", type: "error" });
+      return;
+    }
+    setLoading(true); setMsg(null);
+    try {
+      const res = await fetch(`${API}/api/atendentes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.mensagem || "Erro ao criar atendente");
+      onCriado();
+    } catch (e) {
+      setMsg({ text: e.message, type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputStyle = {
+    width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: "8px",
+    border: `1px solid ${T.border}`, fontFamily: T.font, fontSize: "14px", outline: "none",
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(13,27,42,0.45)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 60 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: "400px" }}>
+        <Card>
+          <h3 style={{ margin: "0 0 18px", fontSize: "16px", fontWeight: "700" }}>Novo atendente</h3>
+
+          {msg && <Toast msg={msg} />}
+
+          <div style={{ marginBottom: "12px" }}>
+            <p style={{ fontSize: "11px", fontWeight: "600", color: T.muted, margin: "0 0 6px" }}>Nome</p>
+            <input style={inputStyle} value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Nome completo" />
+          </div>
+          <div style={{ marginBottom: "12px" }}>
+            <p style={{ fontSize: "11px", fontWeight: "600", color: T.muted, margin: "0 0 6px" }}>Email</p>
+            <input style={inputStyle} type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="atendente@exemplo.com" />
+          </div>
+          <div style={{ marginBottom: "20px" }}>
+            <p style={{ fontSize: "11px", fontWeight: "600", color: T.muted, margin: "0 0 6px" }}>Senha inicial</p>
+            <input style={inputStyle} type="password" value={form.senha} onChange={e => setForm({ ...form, senha: e.target.value })} placeholder="••••••••" />
+          </div>
+
+          <div style={{ display: "flex", gap: "10px" }}>
+            <Btn variant="outline" full onClick={onClose} disabled={loading}>Cancelar</Btn>
+            <Btn variant="primary" full onClick={criar} disabled={loading}>{loading ? "Criando..." : "Criar"}</Btn>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ==================== MODAL: EDITAR ATENDENTE ==================== */
+function ModalEditarAtendente({ token, atendente, onClose, onSalvo }) {
+  const [form, setForm] = useState({ nome: atendente.nome, email: atendente.email });
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const salvar = async () => {
+    setLoading(true); setMsg(null);
+    try {
+      const res = await fetch(`${API}/api/atendentes/${atendente.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.mensagem || "Erro ao salvar");
+      onSalvo();
+    } catch (e) {
+      setMsg({ text: e.message, type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputStyle = {
+    width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: "8px",
+    border: `1px solid ${T.border}`, fontFamily: T.font, fontSize: "14px", outline: "none",
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(13,27,42,0.45)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 60 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: "400px" }}>
+        <Card>
+          <h3 style={{ margin: "0 0 18px", fontSize: "16px", fontWeight: "700" }}>Editar atendente</h3>
+
+          {msg && <Toast msg={msg} />}
+
+          <div style={{ marginBottom: "12px" }}>
+            <p style={{ fontSize: "11px", fontWeight: "600", color: T.muted, margin: "0 0 6px" }}>Nome</p>
+            <input style={inputStyle} value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
+          </div>
+          <div style={{ marginBottom: "20px" }}>
+            <p style={{ fontSize: "11px", fontWeight: "600", color: T.muted, margin: "0 0 6px" }}>Email</p>
+            <input style={inputStyle} type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+          </div>
+
+          <div style={{ display: "flex", gap: "10px" }}>
+            <Btn variant="outline" full onClick={onClose} disabled={loading}>Cancelar</Btn>
+            <Btn variant="primary" full onClick={salvar} disabled={loading}>{loading ? "Salvando..." : "Salvar"}</Btn>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ==================== MODAL: RESETAR SENHA DO ATENDENTE ==================== */
+function ModalResetarSenha({ token, atendente, onClose, onSalvo }) {
+  const [novaSenha, setNovaSenha] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const salvar = async () => {
+    if (!novaSenha || novaSenha.length < 6) {
+      setMsg({ text: "A senha precisa ter pelo menos 6 caracteres.", type: "error" });
+      return;
+    }
+    setLoading(true); setMsg(null);
+    try {
+      const res = await fetch(`${API}/api/atendentes/${atendente.id}/senha`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ novaSenha }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.mensagem || "Erro ao redefinir senha");
+      onSalvo();
+    } catch (e) {
+      setMsg({ text: e.message, type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(13,27,42,0.45)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 60 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: "400px" }}>
+        <Card>
+          <h3 style={{ margin: "0 0 6px", fontSize: "16px", fontWeight: "700" }}>Redefinir senha</h3>
+          <p style={{ margin: "0 0 18px", fontSize: "13px", color: T.muted }}>
+            Nova senha para <strong style={{ color: T.text }}>{atendente.nome}</strong>
+          </p>
+
+          {msg && <Toast msg={msg} />}
+
+          <div style={{ marginBottom: "20px" }}>
+            <input
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: "8px",
+                border: `1px solid ${T.border}`, fontFamily: T.font, fontSize: "14px", outline: "none" }}
+              type="password" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} placeholder="Nova senha (mín. 6 caracteres)"
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: "10px" }}>
+            <Btn variant="outline" full onClick={onClose} disabled={loading}>Cancelar</Btn>
+            <Btn variant="primary" full onClick={salvar} disabled={loading}>{loading ? "Salvando..." : "Redefinir"}</Btn>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ==================== ATENDENTES TAB ==================== */
+function AtendentesTab({ token }) {
+  const [atendentes, setAtendentes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [modalCriar, setModalCriar] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [resetando, setResetando] = useState(null);
+  const [alternandoStatus, setAlternandoStatus] = useState(null); // atendente sendo ativado/desativado
+
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/api/atendentes`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setAtendentes(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setMsg({ text: "Erro ao carregar atendentes.", type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const confirmarAlternarStatus = async () => {
+    const a = alternandoStatus;
+    setLoading(true);
+    try {
+      const url = a.ativo
+        ? `${API}/api/atendentes/${a.id}/desativar`
+        : `${API}/api/atendentes/${a.id}`;
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: a.ativo ? undefined : JSON.stringify({ ativo: true }),
+      });
+      if (!res.ok) throw new Error("Erro ao atualizar status");
+      setMsg({ text: a.ativo ? "Atendente desativado." : "Atendente reativado.", type: "ok" });
+      carregar();
+    } catch (e) {
+      setMsg({ text: e.message, type: "error" });
+    } finally {
+      setLoading(false);
+      setAlternandoStatus(null);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+        <h2 style={{ fontSize: "28px", fontWeight: "800", margin: 0 }}>👥 Atendentes</h2>
+        <Btn variant="primary" onClick={() => setModalCriar(true)}>+ Novo atendente</Btn>
+      </div>
+
+      {msg && <Toast msg={msg} />}
+
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <thead>
+            <tr style={{ background: T.bg }}>
+              {["Nome", "Email", "Status", "Criado em", "Ações"].map(h => (
+                <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: "11px",
+                  fontWeight: "600", color: T.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {atendentes.length === 0 ? (
+              <tr>
+                <td colSpan={5} style={{ padding: "40px", textAlign: "center", color: T.muted }}>
+                  {loading ? "Carregando..." : "Nenhum atendente cadastrado ainda."}
+                </td>
+              </tr>
+            ) : atendentes.map(a => (
+              <tr key={a.id} style={{ borderBottom: `1px solid ${T.border}` }}>
+                <td style={{ padding: "14px 20px", fontWeight: "600" }}>{a.nome}</td>
+                <td style={{ padding: "14px 20px", color: T.muted }}>{a.email}</td>
+                <td style={{ padding: "14px 20px" }}>
+                  <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: "20px",
+                    fontSize: "11px", fontWeight: "600",
+                    background: a.ativo ? T.successLt : "#f0f0f0",
+                    color: a.ativo ? T.success : T.muted }}>
+                    {a.ativo ? "Ativo" : "Inativo"}
+                  </span>
+                </td>
+                <td style={{ padding: "14px 20px", color: T.muted }}>
+                  {a.criado_em ? new Date(a.criado_em).toLocaleDateString("pt-BR") : "—"}
+                </td>
+                <td style={{ padding: "14px 20px" }}>
+                  <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                    <Btn variant="outline" small onClick={() => setEditando(a)}>Editar</Btn>
+                    <Btn variant="outline" small onClick={() => setResetando(a)}>Redefinir senha</Btn>
+                    <Btn variant={a.ativo ? "danger" : "success"} small onClick={() => setAlternandoStatus(a)}>
+                      {a.ativo ? "Desativar" : "Reativar"}
+                    </Btn>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+
+      {modalCriar && (
+        <ModalCriarAtendente
+          token={token}
+          onClose={() => setModalCriar(false)}
+          onCriado={() => { setModalCriar(false); setMsg({ text: "Atendente criado com sucesso!", type: "ok" }); carregar(); }}
+        />
+      )}
+
+      {editando && (
+        <ModalEditarAtendente
+          token={token}
+          atendente={editando}
+          onClose={() => setEditando(null)}
+          onSalvo={() => { setEditando(null); setMsg({ text: "Atendente atualizado!", type: "ok" }); carregar(); }}
+        />
+      )}
+
+      {resetando && (
+        <ModalResetarSenha
+          token={token}
+          atendente={resetando}
+          onClose={() => setResetando(null)}
+          onSalvo={() => { setResetando(null); setMsg({ text: "Senha redefinida com sucesso!", type: "ok" }); }}
+        />
+      )}
+
+      {alternandoStatus && (
+        <ModalConfirmar
+          titulo={alternandoStatus.ativo ? "Desativar atendente" : "Reativar atendente"}
+          mensagem={
+            alternandoStatus.ativo
+              ? `${alternandoStatus.nome} não conseguirá mais acessar o sistema até ser reativado(a). Deseja continuar?`
+              : `${alternandoStatus.nome} voltará a conseguir acessar o sistema normalmente. Deseja continuar?`
+          }
+          confirmLabel={alternandoStatus.ativo ? "Desativar" : "Reativar"}
+          loading={loading}
+          onConfirmar={confirmarAlternarStatus}
+          onCancelar={() => setAlternandoStatus(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 /* ==================== PAINEL PRINCIPAL ==================== */
 function PainelAdmin({ token, onLogout }) {
   const [activeTab, setActiveTab] = useState("painel");
@@ -397,8 +728,14 @@ function PainelAdmin({ token, onLogout }) {
     }
   };
 
+  const [confirmandoReset, setConfirmandoReset] = useState(false);
+
   const resetar = () => {
-    if (!window.confirm("⚠️ Resetar toda a fila do dia?\nTodas as senhas pendentes serão canceladas.")) return;
+    setConfirmandoReset(true);
+  };
+
+  const confirmarReset = () => {
+    setConfirmandoReset(false);
     acao("/api/senhas/resetar");
   };
 
@@ -426,6 +763,9 @@ function PainelAdmin({ token, onLogout }) {
           </button>
           <button onClick={() => setActiveTab("historico")} style={{ padding: "12px 28px", fontWeight: activeTab === "historico" ? "700" : "600", border: "none", background: "none", borderBottom: activeTab === "historico" ? `3px solid ${T.accent}` : "3px solid transparent", color: activeTab === "historico" ? T.accent : T.muted }}>
             Histórico por Data
+          </button>
+          <button onClick={() => setActiveTab("atendentes")} style={{ padding: "12px 28px", fontWeight: activeTab === "atendentes" ? "700" : "600", border: "none", background: "none", borderBottom: activeTab === "atendentes" ? `3px solid ${T.accent}` : "3px solid transparent", color: activeTab === "atendentes" ? T.accent : T.muted }}>
+            Atendentes
           </button>
           <button onClick={() => setActiveTab("config")} style={{ padding: "12px 28px", fontWeight: activeTab === "config" ? "700" : "600", border: "none", background: "none", borderBottom: activeTab === "config" ? `3px solid ${T.accent}` : "3px solid transparent", color: activeTab === "config" ? T.accent : T.muted }}>
             Configurações
@@ -567,10 +907,23 @@ function PainelAdmin({ token, onLogout }) {
   </>
 ) : activeTab === "historico" ? (
   <HistoricoTab token={token} />
+) : activeTab === "atendentes" ? (
+  <AtendentesTab token={token} />
 ) : activeTab === "config" ? (
   <ConfigTab token={token} />
 ) : null}
       </div>
+
+      {confirmandoReset && (
+        <ModalConfirmar
+          titulo="Resetar fila do dia"
+          mensagem="Todas as senhas pendentes hoje serão canceladas. Essa ação não pode ser desfeita."
+          confirmLabel="Resetar fila"
+          loading={loading}
+          onConfirmar={confirmarReset}
+          onCancelar={() => setConfirmandoReset(false)}
+        />
+      )}
     </div>
   );
   

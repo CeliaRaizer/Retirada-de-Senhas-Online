@@ -6,7 +6,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { io } from "socket.io-client";
-import { T, Card, Btn, Toast, NavFluxo, CardMinhaSenha, injectFont } from "./ClientePage";
+import { T, Card, Btn, Toast, NavFluxo, CardMinhaSenha, ModalConfirmar, injectFont } from "./ClientePage";
 
 const API = "http://localhost:3000";
 
@@ -49,8 +49,9 @@ export default function AcompanharPage() {
     return () => socket.disconnect();
   }, [buscarStatus]);
 
+  const [confirmandoCancelar, setConfirmandoCancelar] = useState(false);
+
   const cancelar = async () => {
-    if (!window.confirm("Deseja cancelar esta senha?")) return;
     setLoading(true);
     try {
       await fetch(`${API}/api/senha/anonima/cancelar`, {
@@ -64,6 +65,7 @@ export default function AcompanharPage() {
       setMsg({ text: "Não foi possível cancelar agora.", type: "error" });
     } finally {
       setLoading(false);
+      setConfirmandoCancelar(false);
     }
   };
 
@@ -88,9 +90,20 @@ export default function AcompanharPage() {
         )}
 
         {senha && (
-          <CardMinhaSenha senha={senha} onCancelar={cancelar} loading={loading} />
+          <CardMinhaSenha senha={senha} onCancelar={() => setConfirmandoCancelar(true)} loading={loading} />
         )}
       </div>
+
+      {confirmandoCancelar && (
+        <ModalConfirmar
+          titulo="Cancelar senha"
+          mensagem={`Tem certeza que deseja cancelar a senha ${numero}? Essa ação não pode ser desfeita.`}
+          confirmLabel="Cancelar senha"
+          loading={loading}
+          onConfirmar={cancelar}
+          onCancelar={() => setConfirmandoCancelar(false)}
+        />
+      )}
     </div>
   );
 }

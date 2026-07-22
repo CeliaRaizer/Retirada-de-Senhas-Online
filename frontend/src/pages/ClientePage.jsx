@@ -91,6 +91,27 @@ const Label = ({ children }) => (
 
 const Divider = () => <hr style={{ border: "none", borderTop: `1px solid ${T.border}`, margin: "24px 0" }} />;
 
+/* ── MODAL DE CONFIRMAÇÃO (substitui window.confirm) ── */
+export function ModalConfirmar({ titulo = "Confirmar ação", mensagem, onConfirmar, onCancelar, loading, confirmLabel = "Confirmar" }) {
+  return (
+    <div onClick={onCancelar} style={{ position: "fixed", inset: 0, background: "rgba(13,27,42,0.45)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 60 }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: "380px" }}>
+        <Card>
+          <h3 style={{ margin: "0 0 8px", fontSize: "16px", fontWeight: "700", color: T.text }}>{titulo}</h3>
+          <p style={{ margin: "0 0 22px", fontSize: "13px", color: T.muted, lineHeight: 1.5 }}>{mensagem}</p>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <Btn variant="outline" full onClick={onCancelar} disabled={loading}>Voltar</Btn>
+            <Btn variant="danger" full onClick={onConfirmar} disabled={loading}>
+              {loading ? "Aguarde..." : confirmLabel}
+            </Btn>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 /* ── ÍCONE GOOGLE (reutilizado em vários botões) ── */
 const GoogleIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 48 48">
@@ -170,7 +191,7 @@ export function NavFluxo({ nome, foto, painelHref = "/telao" }) {
 }
 
 /* ── TELA CHEIA: escolher tipo de atendimento ── */
-function TelaTipoAtendimento({ nome, foto, onVoltar, onConfirmar, loading, msg, mostrarLoginLink, onIrParaLogin }) {
+function TelaTipoAtendimento({ nome, foto, onVoltar, voltarLabel = "← Voltar", onConfirmar, loading, msg, mostrarLoginLink, onIrParaLogin }) {
   const [tipo, setTipo] = useState("normal");
   const opcoes = [
     { v: "normal",      icon: "👤", label: "Atendimento normal",     desc: "Fila padrão"              },
@@ -181,22 +202,22 @@ function TelaTipoAtendimento({ nome, foto, onVoltar, onConfirmar, loading, msg, 
       <NavFluxo nome={nome} foto={foto} />
       <div style={{ maxWidth: "560px", margin: "0 auto", padding: "48px 24px" }}>
         {nome && (
-          <h2 style={{ fontSize: "26px", fontWeight: "700", color: T.muted, margin: "0 0 20px" }}>
+          <h2 style={{ fontSize: "26px", fontWeight: "700", color: T.muted, margin: "0 0 28px" }}>
             Bem-Vindo(a) <span style={{ color: T.accent }}>{nome.split(" ")[0]}!</span>
           </h2>
         )}
 
         {onVoltar && (
           <a href="#" onClick={e => { e.preventDefault(); onVoltar(); }}
-            style={{ display: "inline-block", color: T.muted, fontSize: "14px", textDecoration: "none", marginBottom: "20px" }}>
-            ← Voltar
+            style={{ display: "inline-block", color: T.muted, fontSize: "14px", textDecoration: "none", marginBottom: "32px" }}>
+            {voltarLabel}
           </a>
         )}
 
-        <h1 style={{ fontSize: "30px", fontWeight: "800", color: T.text, margin: "0 0 6px" }}>
+        <h1 style={{ fontSize: "30px", fontWeight: "700", color: T.text, margin: "0 0 10px" }}>
           Qual o tipo de atendimento?
         </h1>
-        <p style={{ fontSize: "14px", color: T.muted, margin: "0 0 28px" }}>
+        <p style={{ fontSize: "14px", color: T.muted, margin: "0 0 32px" }}>
           Escolha a opção que se aplica a você agora
         </p>
 
@@ -531,8 +552,9 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
     }
   };
 
+  const [confirmandoCancelar, setConfirmandoCancelar] = useState(false);
+
   const cancelarComoVisitante = async () => {
-    if (!window.confirm("Deseja cancelar sua senha?")) return;
     setLoading(true);
     try {
       await fetch(`${API}/api/senha/anonima/cancelar`, {
@@ -549,6 +571,7 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
       setMsg({ text: "Não foi possível cancelar agora. Tente novamente.", type: "error" });
     } finally {
       setLoading(false);
+      setConfirmandoCancelar(false);
     }
   };
 
@@ -573,8 +596,19 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
           ← Voltar
         </a>
         {msg && <div style={{ marginBottom: "16px" }}><Toast msg={msg} /></div>}
-        <CardMinhaSenha senha={ticketDados} onCancelar={cancelarComoVisitante} loading={loading} />
+        <CardMinhaSenha senha={ticketDados} onCancelar={() => setConfirmandoCancelar(true)} loading={loading} />
       </div>
+
+      {confirmandoCancelar && (
+        <ModalConfirmar
+          titulo="Cancelar senha"
+          mensagem={`Tem certeza que deseja cancelar a senha ${ticketDados.numero}? Essa ação não pode ser desfeita.`}
+          confirmLabel="Cancelar senha"
+          loading={loading}
+          onConfirmar={cancelarComoVisitante}
+          onCancelar={() => setConfirmandoCancelar(false)}
+        />
+      )}
     </div>
   );
 
@@ -872,6 +906,7 @@ function PainelCliente({ token, onLogout }) {
 
   useEffect(() => {
     if (tela === "retirar" && minhaSenha) setTela("minha");
+    if (tela === "minha" && !minhaSenha) setTela("retirar");
   }, [tela, minhaSenha]);
 
   const retirar = async (tipo) => {
@@ -891,8 +926,9 @@ function PainelCliente({ token, onLogout }) {
     finally { setLoading(false); }
   };
 
+  const [confirmandoCancelar, setConfirmandoCancelar] = useState(false);
+
   const cancelar = async () => {
-    if (!window.confirm("Deseja cancelar sua senha?")) return;
     setLoading(true);
     try {
       await fetch(`${API}/api/minha-senha/cancelar`, {
@@ -902,7 +938,7 @@ function PainelCliente({ token, onLogout }) {
       setMsg({ text: "Senha cancelada.", type: "ok" });
       setTela("retirar");
     } catch (e) { setMsg({ text: e.message, type: "error" }); }
-    finally { setLoading(false); }
+    finally { setLoading(false); setConfirmandoCancelar(false); }
   };
 
   const navItems = [
@@ -956,7 +992,8 @@ function PainelCliente({ token, onLogout }) {
       <TelaTipoAtendimento
         nome={nome}
         foto={foto}
-        onVoltar={() => setTela("minha")}
+        onVoltar={onLogout}
+        voltarLabel="Sair"
         onConfirmar={retirar}
         loading={loading}
         msg={msg}
@@ -965,32 +1002,39 @@ function PainelCliente({ token, onLogout }) {
   }
 
   /* Minha senha */
-  if (tela === "minha") return (
-    <div style={{ minHeight: "100vh", background: T.bg, fontFamily: T.font }}>
-      <NavFluxo nome={nome} foto={foto} />
-      <div style={{ maxWidth: "480px", margin: "0 auto", padding: "48px 24px" }}>
-        <button onClick={onLogout} style={{ display: "block", marginLeft: "auto", marginBottom: "16px",
-          background: "none", border: "none", cursor: "pointer", color: T.muted, fontSize: "12px",
-          textDecoration: "underline" }}>
-          Sair
-        </button>
+  if (tela === "minha") {
+    if (!minhaSenha) {
+      return null; // defensivo: sem senha ativa, não há o que mostrar aqui
+    }
 
-        {msg && <div style={{ marginBottom: "16px" }}><Toast msg={msg} /></div>}
+    return (
+      <div style={{ minHeight: "100vh", background: T.bg, fontFamily: T.font }}>
+        <NavFluxo nome={nome} foto={foto} />
+        <div style={{ maxWidth: "480px", margin: "0 auto", padding: "48px 24px" }}>
+          <button onClick={onLogout} style={{ display: "block", marginLeft: "auto", marginBottom: "16px",
+            background: "none", border: "none", cursor: "pointer", color: T.muted, fontSize: "12px",
+            textDecoration: "underline" }}>
+            Sair
+          </button>
 
-        {!minhaSenha ? (
-          <Card>
-            <div style={{ textAlign: "center", padding: "24px 0" }}>
-              <p style={{ fontSize: "48px", margin: "0 0 12px" }}>🎫</p>
-              <p style={{ color: T.muted, margin: "0 0 24px" }}>Você não possui senha ativa.</p>
-              <Btn variant="primary" onClick={() => setTela("retirar")}>Retirar senha</Btn>
-            </div>
-          </Card>
-        ) : (
-          <CardMinhaSenha senha={minhaSenha} onCancelar={cancelar} loading={loading} historico={historico} />
+          {msg && <div style={{ marginBottom: "16px" }}><Toast msg={msg} /></div>}
+
+          <CardMinhaSenha senha={minhaSenha} onCancelar={() => setConfirmandoCancelar(true)} loading={loading} historico={historico} />
+        </div>
+
+        {confirmandoCancelar && (
+          <ModalConfirmar
+            titulo="Cancelar senha"
+            mensagem={`Tem certeza que deseja cancelar a senha ${minhaSenha?.numero}? Essa ação não pode ser desfeita.`}
+            confirmLabel="Cancelar senha"
+            loading={loading}
+            onConfirmar={cancelar}
+            onCancelar={() => setConfirmandoCancelar(false)}
+          />
         )}
       </div>
-    </div>
-  );
+    );
+  }
 
   /* Fila */
   if (tela === "fila") return layout("Fila de Atendimento",
