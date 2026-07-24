@@ -5,6 +5,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ClientePage from "./pages/ClientePage";
 import AdminPage   from "./pages/AdminPage";
+import AtendentePage from "./pages/AtendentePage";
 import TelaoPage   from "./pages/TelaoPage";
 import RedefinirSenhaPage from "./pages/RedefinirSenhaPage";
 import AcompanharPage from "./pages/AcompanharPage";
@@ -15,6 +16,7 @@ export default function App() {
       <Routes>
         <Route path="/"      element={<ClientePage />} />
         <Route path="/admin" element={<AdminPage />}   />
+        <Route path="/atendente" element={<AtendentePage />} />
         <Route path="/telao" element={<TelaoPage />}   />
         <Route path="/redefinir-senha" element={<RedefinirSenhaPage />} />
         <Route path="/acompanhar" element={<AcompanharPage />} />

@@ -166,7 +166,8 @@ export function NavFluxo({ nome, foto, painelHref = "/telao" }) {
       display: "flex", alignItems: "center", justifyContent: "space-between", height: "60px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "28px" }}>
         <span style={{ fontWeight: "800", fontSize: "16px", color: T.text }}>Retirada de Senhas</span>
-        <a href={painelHref} style={{ color: T.muted, fontSize: "14px", textDecoration: "none" }}>Painel</a>
+        <a href={painelHref} target="_blank" rel="noopener noreferrer"
+          style={{ color: T.muted, fontSize: "14px", textDecoration: "none" }}>Painel</a>
       </div>
       {nome ? (
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -331,7 +332,23 @@ export function CardMinhaSenha({ senha, onCancelar, loading, historico }) {
             </div>
           )}
 
-          {linkAcompanhar && (
+          {senha.status === "atendido" && (
+            <div style={{ background: T.successLt, borderRadius: "8px", padding: "14px", margin: "0 0 20px" }}>
+              <p style={{ margin: 0, fontWeight: "700", color: T.success, fontSize: "14px" }}>
+                ✅ Atendimento finalizado. Obrigado por aguardar!
+              </p>
+            </div>
+          )}
+
+          {senha.status === "cancelado" && (
+            <div style={{ background: "#f0f0f0", borderRadius: "8px", padding: "14px", margin: "0 0 20px" }}>
+              <p style={{ margin: 0, fontWeight: "700", color: T.muted, fontSize: "14px" }}>
+                Esta senha foi cancelada.
+              </p>
+            </div>
+          )}
+
+          {linkAcompanhar && senha.status !== "atendido" && senha.status !== "cancelado" && (
             <div style={{ display: "flex", justifyContent: "center", gap: "28px", alignItems: "flex-start",
               margin: "12px 0 8px" }}>
               <div style={{ textAlign: "center" }}>
@@ -346,12 +363,12 @@ export function CardMinhaSenha({ senha, onCancelar, loading, historico }) {
                 </button>
               </div>
               <div style={{ textAlign: "center" }}>
-                <a href="/telao" style={{ display: "flex", width: "100px", height: "100px", alignItems: "center",
+                <a href="/telao" target="_blank" rel="noopener noreferrer" style={{ display: "flex", width: "100px", height: "100px", alignItems: "center",
                   justifyContent: "center", border: `1px solid ${T.border}`, borderRadius: "8px",
                   color: T.muted, textDecoration: "none", fontSize: "28px", boxSizing: "border-box" }}>
                   📺
                 </a>
-                <a href="/telao" style={{ display: "block", marginTop: "8px", color: T.accent, fontSize: "12px",
+                <a href="/telao" target="_blank" rel="noopener noreferrer" style={{ display: "block", marginTop: "8px", color: T.accent, fontSize: "12px",
                   fontWeight: "600", textDecoration: "none" }}>
                   Ver painel
                 </a>
@@ -425,19 +442,27 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
       if (!res.ok) return; // senha não existe mais (ex: fila resetada) — mantém tela anterior
       const data = await res.json();
       setTicketDados({ ...data, codigoAcesso: registro.codigoAcesso });
+
+      // Senha já finalizada/cancelada: some com o card da landing page
+      // (mas mantém ticketDados, pra quem estiver na tela de detalhe ver o status final)
+      if (data.status === "atendido" || data.status === "cancelado") {
+        localStorage.removeItem("visitante_ticket");
+        setTicketVisitante(null);
+      }
     } catch {}
   }, []);
 
-  // Enquanto a tela do ticket estiver aberta, mantém os dados
-  // atualizados em tempo real (posição na fila, chamada, etc.)
+  // Enquanto o visitante tiver uma senha ativa guardada, mantém os dados
+  // atualizados em tempo real (posição na fila, chamada, finalização) —
+  // mesmo que ele esteja navegando pela landing page, não só na tela do ticket.
   useEffect(() => {
-    if (!telaTicket || !ticketVisitante) return;
+    if (!ticketVisitante) return;
     buscarStatusVisitante(ticketVisitante);
     const socket = io(API);
     socket.on("filaAtualizada", () => buscarStatusVisitante(ticketVisitante));
     socket.on("senhaChamada", () => buscarStatusVisitante(ticketVisitante));
     return () => socket.disconnect();
-  }, [telaTicket, ticketVisitante, buscarStatusVisitante]);
+  }, [ticketVisitante, buscarStatusVisitante]);
 
   useEffect(() => {
     if (avisoInicial) setMsg(avisoInicial);
@@ -620,8 +645,10 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
           font-size: 22px; color: ${T.text}; line-height: 1; padding: 4px; }
         .rs-nav-mobile { display: none; }
         .rs-hero-grid { display: grid; grid-template-columns: 1fr 400px; gap: 48px; align-items: start; }
+        .rs-steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
         @media (max-width: 900px) {
           .rs-hero-grid { grid-template-columns: 1fr; }
+          .rs-steps-grid { grid-template-columns: 1fr; }
         }
         @media (max-width: 680px) {
           .rs-nav-links > a { display: none; }
@@ -637,7 +664,7 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
         <div className="rs-nav-links">
           <span style={{ fontWeight: "800", fontSize: "16px", color: T.text }}>Retirada de Senhas</span>
           <a href="#como-funciona" style={{ color: T.muted, fontSize: "14px", textDecoration: "none" }}>Como funciona</a>
-          <a href="/telao" style={{ color: T.muted, fontSize: "14px", textDecoration: "none" }}>Painel</a>
+          <a href="/telao" target="_blank" rel="noopener noreferrer" style={{ color: T.muted, fontSize: "14px", textDecoration: "none" }}>Painel</a>
         </div>
         <button className="rs-nav-toggle" aria-label="Abrir menu" onClick={() => setMenuAberto(v => !v)}>
           {menuAberto ? "✕" : "☰"}
@@ -649,7 +676,7 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
           background: T.surface, borderBottom: `1px solid ${T.border}`, padding: "8px 24px 16px" }}>
           <a href="#como-funciona" onClick={() => setMenuAberto(false)}
             style={{ color: T.text, fontSize: "14px", textDecoration: "none", padding: "10px 0" }}>Como funciona</a>
-          <a href="/telao" onClick={() => setMenuAberto(false)}
+          <a href="/telao" target="_blank" rel="noopener noreferrer" onClick={() => setMenuAberto(false)}
             style={{ color: T.text, fontSize: "14px", textDecoration: "none", padding: "10px 0" }}>Painel</a>
         </div>
       )}
@@ -674,7 +701,7 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
             <Btn variant="primary" onClick={() => { setMsg(null); setTelaTipoAberta(true); }} disabled={loading}>
               Retirar minha senha
             </Btn>
-            <Btn variant="outline" onClick={() => { window.location.href = "/telao"; }}>
+            <Btn variant="outline" onClick={() => { window.open("/telao", "_blank", "noopener,noreferrer"); }}>
               Ver painel ao vivo
             </Btn>
           </div>
@@ -818,34 +845,102 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
         </div>
       </div>
 
-      {/* INFO: visitante vs conta */}
-      <div id="como-funciona" style={{ background: T.surface, borderTop: `1px solid ${T.border}`, padding: "48px 24px" }}>
-        <div className="rs-info-grid" style={{ maxWidth: "1080px", margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-          <Card>
-            <h4 style={{ margin: "0 0 10px", fontSize: "16px", fontWeight: "700", color: T.text }}>
-              Retirar como visitante
-            </h4>
-            <ul style={{ margin: 0, paddingLeft: "18px", color: T.muted, fontSize: "13px", lineHeight: 1.9 }}>
-              <li>Gera uma senha na hora</li>
-              <li>Acompanhe pelo número</li>
-              <li>Sem login</li>
-            </ul>
-          </Card>
-          <Card>
-            <h4 style={{ margin: "0 0 10px", fontSize: "16px", fontWeight: "700", color: T.text }}>
-              Retirar com Conta/Google
-            </h4>
-            <ul style={{ margin: 0, paddingLeft: "18px", color: T.muted, fontSize: "13px", lineHeight: 1.9 }}>
-              <li>Sua senha fica salva na conta</li>
-              <li>Veja histórico e prioridades</li>
-            </ul>
-          </Card>
+      {/* INFO: como funciona + visitante vs conta */}
+      <div id="como-funciona" style={{ background: T.surface, borderTop: `1px solid ${T.border}`, padding: "64px 24px" }}>
+        <div style={{ maxWidth: "1080px", margin: "0 auto" }}>
+
+          <div style={{ textAlign: "center", marginBottom: "44px" }}>
+            <span style={{ display: "inline-block", background: T.accentLt, color: T.accent,
+              fontSize: "12px", fontWeight: "700", padding: "6px 14px", borderRadius: "20px", marginBottom: "16px" }}>
+              Como funciona
+            </span>
+            <h2 style={{ fontSize: "28px", fontWeight: "800", color: T.text, margin: "0 0 10px" }}>
+              Três passos e pronto
+            </h2>
+            <p style={{ fontSize: "14px", color: T.muted, margin: "0 auto", maxWidth: "480px" }}>
+              Sem precisar chegar mais cedo nem enfrentar fila física.
+            </p>
+          </div>
+
+          {/* Passo a passo */}
+          <div className="rs-steps-grid" style={{ marginBottom: "48px" }}>
+            {[
+              { n: "1", icon: "🎫", title: "Escolha o atendimento", desc: "Normal ou prioritário (idosos, gestantes e PCD)." },
+              { n: "2", icon: "⚡", title: "Retire sua senha", desc: "Na hora, com ou sem conta — leva menos de 10 segundos." },
+              { n: "3", icon: "📺", title: "Acompanhe em tempo real", desc: "Pelo QR code, link direto ou pelo telão ao vivo." },
+            ].map(p => (
+              <Card key={p.n} style={{ position: "relative" }}>
+                <span style={{ position: "absolute", top: "18px", right: "20px", fontSize: "12px",
+                  fontWeight: "700", color: T.border }}>0{p.n}</span>
+                <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: T.accentLt,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", marginBottom: "16px" }}>
+                  {p.icon}
+                </div>
+                <h4 style={{ margin: "0 0 6px", fontSize: "15px", fontWeight: "700", color: T.text }}>
+                  {p.title}
+                </h4>
+                <p style={{ margin: 0, fontSize: "13px", color: T.muted, lineHeight: 1.6 }}>
+                  {p.desc}
+                </p>
+              </Card>
+            ))}
+          </div>
+
+          {/* Comparação: visitante vs conta */}
+          <div className="rs-info-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+            <Card>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                <span style={{ width: "36px", height: "36px", borderRadius: "10px", background: T.bg,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px" }}>👤</span>
+                <h4 style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: T.text }}>
+                  Retirar como visitante
+                </h4>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {[
+                  "Gera uma senha na hora, sem cadastro",
+                  "Acompanhe pelo QR code, link ou telão",
+                  "Vale só para o atendimento do dia",
+                ].map(item => (
+                  <div key={item} style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                    <span style={{ color: T.accent, fontSize: "13px", fontWeight: "700", marginTop: "1px" }}>✓</span>
+                    <span style={{ fontSize: "13px", color: T.muted, lineHeight: 1.6 }}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card style={{ position: "relative", borderColor: T.accent }}>
+              <span style={{ position: "absolute", top: "-11px", right: "20px", background: T.accent, color: "#fff",
+                fontSize: "10px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", letterSpacing: "0.04em" }}>
+                RECOMENDADO
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+                <span style={{ width: "36px", height: "36px", borderRadius: "10px", background: T.accentLt,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px" }}>🔐</span>
+                <h4 style={{ margin: 0, fontSize: "16px", fontWeight: "700", color: T.text }}>
+                  Retirar com conta ou Google
+                </h4>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {[
+                  "Histórico completo dos seus atendimentos",
+                  "Login rápido com Google, sem digitar e-mail toda vez",
+                  "Recupera acesso por e-mail se esquecer a senha",
+                ].map(item => (
+                  <div key={item} style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                    <span style={{ color: T.accent, fontSize: "13px", fontWeight: "700", marginTop: "1px" }}>✓</span>
+                    <span style={{ fontSize: "13px", color: T.muted, lineHeight: 1.6 }}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
         </div>
       </div>
 
       <p style={{ textAlign: "center", color: T.muted, fontSize: "12px", padding: "20px", margin: 0 }}>
-        Retirada de Senhas · Sistema de atendimento online ·{" "}
-        <a href="/admin" style={{ color: T.muted }}>painel admin</a>
+        Retirada de Senhas · Sistema de atendimento online {" "}
       </p>
     </div>
   );

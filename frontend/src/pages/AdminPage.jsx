@@ -111,11 +111,12 @@ function LoginAdmin({ onLogin }) {
       display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
       <div style={{ width: "100%", maxWidth: "400px" }}>
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <div style={{ width: "56px", height: "56px", borderRadius: "14px", background: T.accent,
-            margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontSize: "26px" }}>⚙️</span>
+          <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: T.accent,
+            margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 6px 18px rgba(27,79,138,0.28)" }}>
+            <span style={{ fontSize: "24px" }}>⚙️</span>
           </div>
-          <h1 style={{ fontSize: "24px", fontWeight: "800", color: T.text, margin: "0 0 6px" }}>
+          <h1 style={{ fontSize: "21px", fontWeight: "600", color: T.text, margin: "0 0 6px", letterSpacing: "-0.01em" }}>
             Painel Administrativo
           </h1>
           <p style={{ color: T.muted, fontSize: "13px", margin: 0 }}>
