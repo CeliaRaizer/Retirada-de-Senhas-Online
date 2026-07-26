@@ -5,27 +5,28 @@
 import { useState, useEffect, useCallback } from "react";
 import { io } from "socket.io-client";
 import { QRCodeSVG } from "qrcode.react";
+import { useTema, ThemeToggle } from "../theme";
 
 const API = "http://localhost:3000";
 const FRONTEND_URL = "http://localhost:5173";
 
 export const T = {
-  bg:       "#f4f6f9",
-  surface:  "#ffffff",
-  border:   "#e2e6ec",
-  text:     "#0d1b2a",
-  muted:    "#7a8899",
-  accent:   "#1b4f8a",
-  accentLt: "#e8f0fb",
-  success:  "#1a7a4a",
-  successLt:"#e6f4ed",
-  danger:   "#b52a2a",
-  dangerLt: "#fdeaea",
-  warn:     "#c47c00",
-  warnLt:   "#fff8e6",
+  bg:       "var(--rs-bg)",
+  surface:  "var(--rs-surface)",
+  border:   "var(--rs-border)",
+  text:     "var(--rs-text)",
+  muted:    "var(--rs-muted)",
+  accent:   "var(--rs-accent)",
+  accentLt: "var(--rs-accent-lt)",
+  success:  "var(--rs-success)",
+  successLt:"var(--rs-success-lt)",
+  danger:   "var(--rs-danger)",
+  dangerLt: "var(--rs-danger-lt)",
+  warn:     "var(--rs-warn)",
+  warnLt:   "var(--rs-warn-lt)",
   font:     "'Sora', sans-serif",
   radius:   "10px",
-  shadow:   "0 2px 16px rgba(13,27,42,0.08)",
+  shadow:   "var(--rs-shadow)",
 };
 
 export const injectFont = () => {
@@ -48,7 +49,7 @@ export const Btn = ({ children, variant = "primary", onClick, disabled, full, sm
     outline: { background: "transparent", color: T.accent, border: `1.5px solid ${T.accent}` },
     danger:  { background: T.dangerLt,  color: T.danger,  border: `1.5px solid #f0b0b0` },
     ghost:   { background: "transparent", color: T.muted },
-    google:  { background: "#fff", color: T.text, border: `1.5px solid ${T.border}`,
+    google:  { background: "#fff", color: "#0d1b2a", border: "1.5px solid #e2e6ec",
                boxShadow: "0 1px 4px rgba(0,0,0,0.08)" },
   };
   return <button style={{ ...base, ...variants[variant] }} onClick={onClick} disabled={disabled}>{children}</button>;
@@ -161,6 +162,7 @@ function decodeJwtPayload(token) {
 
 /* ── NAV — usada nas telas de fluxo (tipo de atendimento) ── */
 export function NavFluxo({ nome, foto, painelHref = "/telao" }) {
+  const [tema, alternarTema] = useTema();
   return (
     <div style={{ background: T.surface, borderBottom: `1px solid ${T.border}`, padding: "0 24px",
       display: "flex", alignItems: "center", justifyContent: "space-between", height: "60px" }}>
@@ -169,24 +171,27 @@ export function NavFluxo({ nome, foto, painelHref = "/telao" }) {
         <a href={painelHref} target="_blank" rel="noopener noreferrer"
           style={{ color: T.muted, fontSize: "14px", textDecoration: "none" }}>Painel</a>
       </div>
-      {nome ? (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          {foto ? (
-            <img src={foto} alt={nome} referrerPolicy="no-referrer" style={{ width: "28px", height: "28px",
-              borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `1px solid ${T.border}` }} />
-          ) : (
-            <span style={{ width: "28px", height: "28px", borderRadius: "50%", background: T.accent,
-              color: "#fff", fontSize: "11px", fontWeight: "700", display: "flex", alignItems: "center",
-              justifyContent: "center", flexShrink: 0 }}>{getIniciais(nome)}</span>
-          )}
-          <span style={{ fontSize: "13px", fontWeight: "600", color: T.text }}>{nome}</span>
-        </div>
-      ) : (
-        <span style={{ display: "flex", alignItems: "center", gap: "6px", background: T.accentLt,
-          color: T.accent, fontSize: "12px", fontWeight: "700", padding: "6px 12px", borderRadius: "20px" }}>
-          👤 Visitante
-        </span>
-      )}
+      <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+        <ThemeToggle tema={tema} onToggle={alternarTema} />
+        {nome ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {foto ? (
+              <img src={foto} alt={nome} referrerPolicy="no-referrer" style={{ width: "28px", height: "28px",
+                borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `1px solid ${T.border}` }} />
+            ) : (
+              <span style={{ width: "28px", height: "28px", borderRadius: "50%", background: T.accent,
+                color: "#fff", fontSize: "11px", fontWeight: "700", display: "flex", alignItems: "center",
+                justifyContent: "center", flexShrink: 0 }}>{getIniciais(nome)}</span>
+            )}
+            <span style={{ fontSize: "13px", fontWeight: "600", color: T.text }}>{nome}</span>
+          </div>
+        ) : (
+          <span style={{ display: "flex", alignItems: "center", gap: "6px", background: T.accentLt,
+            color: T.accent, fontSize: "12px", fontWeight: "700", padding: "6px 12px", borderRadius: "20px" }}>
+            👤 Visitante
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -421,6 +426,7 @@ export function CardMinhaSenha({ senha, onCancelar, loading, historico }) {
 
 /* ── LANDING PAGE ── */
 function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
+  const [tema, alternarTema] = useTema();
   const [modo, setModo] = useState("login"); // "login" | "cadastro" | "recuperar"
   const [form, setForm] = useState({ nome: "", email: "", senha: "" });
   const [loading, setLoading] = useState(false);
@@ -666,9 +672,12 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
           <a href="#como-funciona" style={{ color: T.muted, fontSize: "14px", textDecoration: "none" }}>Como funciona</a>
           <a href="/telao" target="_blank" rel="noopener noreferrer" style={{ color: T.muted, fontSize: "14px", textDecoration: "none" }}>Painel</a>
         </div>
-        <button className="rs-nav-toggle" aria-label="Abrir menu" onClick={() => setMenuAberto(v => !v)}>
-          {menuAberto ? "✕" : "☰"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <ThemeToggle tema={tema} onToggle={alternarTema} />
+          <button className="rs-nav-toggle" aria-label="Abrir menu" onClick={() => setMenuAberto(v => !v)}>
+            {menuAberto ? "✕" : "☰"}
+          </button>
+        </div>
       </div>
 
       {menuAberto && (

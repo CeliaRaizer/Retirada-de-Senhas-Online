@@ -6,26 +6,27 @@
 import { useState, useEffect, useCallback } from "react";
 import { io } from "socket.io-client";
 import { ModalConfirmar } from "./ClientePage";
+import { useTema, ThemeToggle } from "../theme";
 
 const API = "http://localhost:3000";
 
 const T = {
-  bg:       "#f4f6f9",
-  surface:  "#ffffff",
-  border:   "#e2e6ec",
-  text:     "#0d1b2a",
-  muted:    "#7a8899",
-  accent:   "#1b4f8a",
-  accentLt: "#e8f0fb",
-  success:  "#1a7a4a",
-  successLt:"#e6f4ed",
-  danger:   "#b52a2a",
-  dangerLt: "#fdeaea",
-  warn:     "#c47c00",
-  warnLt:   "#fff8e6",
+  bg:       "var(--rs-bg)",
+  surface:  "var(--rs-surface)",
+  border:   "var(--rs-border)",
+  text:     "var(--rs-text)",
+  muted:    "var(--rs-muted)",
+  accent:   "var(--rs-accent)",
+  accentLt: "var(--rs-accent-lt)",
+  success:  "var(--rs-success)",
+  successLt:"var(--rs-success-lt)",
+  danger:   "var(--rs-danger)",
+  dangerLt: "var(--rs-danger-lt)",
+  warn:     "var(--rs-warn)",
+  warnLt:   "var(--rs-warn-lt)",
   font:     "'Sora', sans-serif",
   radius:   "10px",
-  shadow:   "0 2px 16px rgba(13,27,42,0.08)",
+  shadow:   "var(--rs-shadow)",
 };
 
 const injectFont = () => {
@@ -92,6 +93,7 @@ const Toast = ({ msg }) => {
 
 /* ==================== LOGIN ATENDENTE ==================== */
 function LoginAtendente({ onLogin }) {
+  const [tema, alternarTema] = useTema();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
@@ -120,7 +122,10 @@ function LoginAtendente({ onLogin }) {
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, fontFamily: T.font,
-      display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+      display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", position: "relative" }}>
+      <div style={{ position: "absolute", top: "20px", right: "20px" }}>
+        <ThemeToggle tema={tema} onToggle={alternarTema} />
+      </div>
       <div style={{ width: "100%", maxWidth: "400px" }}>
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
           <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: T.accent,
@@ -178,6 +183,7 @@ function LoginAtendente({ onLogin }) {
 
 /* ==================== PAINEL DO ATENDENTE ==================== */
 function PainelAtendente({ token, onLogout }) {
+  const [tema, alternarTema] = useTema();
   const usuario = decodificarToken(token);
   const [senhas, setSenhas] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -254,6 +260,7 @@ function PainelAtendente({ token, onLogout }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <a href="/telao" target="_blank" style={{ color: "#aabbcc", fontSize: "12px", textDecoration: "none" }}>Abrir telão ↗</a>
+          <ThemeToggle tema={tema} onToggle={alternarTema} dark />
           <Btn variant="ghost" small onClick={onLogout}>Sair</Btn>
         </div>
       </div>

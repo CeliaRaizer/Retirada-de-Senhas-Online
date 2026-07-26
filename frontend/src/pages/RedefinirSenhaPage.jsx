@@ -4,14 +4,15 @@
  * permite definir uma nova senha.
  */
 import { useState } from "react";
+import { useTema, ThemeToggle } from "../theme";
 
 const API = "http://localhost:3000";
 
 const T = {
-  bg: "#f4f6f9", surface: "#ffffff", border: "#e2e6ec", text: "#0d1b2a",
-  muted: "#7a8899", accent: "#1b4f8a", accentLt: "#e8f0fb",
-  success: "#1a7a4a", successLt: "#e6f4ed", danger: "#b52a2a", dangerLt: "#fdeaea",
-  font: "'Sora', sans-serif", radius: "10px", shadow: "0 2px 16px rgba(13,27,42,0.08)",
+  bg: "var(--rs-bg)", surface: "var(--rs-surface)", border: "var(--rs-border)", text: "var(--rs-text)",
+  muted: "var(--rs-muted)", accent: "var(--rs-accent)", accentLt: "var(--rs-accent-lt)",
+  success: "var(--rs-success)", successLt: "var(--rs-success-lt)", danger: "var(--rs-danger)", dangerLt: "var(--rs-danger-lt)",
+  font: "'Sora', sans-serif", radius: "10px", shadow: "var(--rs-shadow)",
 };
 
 const inputStyle = {
@@ -20,6 +21,7 @@ const inputStyle = {
 };
 
 export default function RedefinirSenhaPage() {
+  const [tema, alternarTema] = useTema();
   const params = new URLSearchParams(window.location.search);
   const token = params.get("token");
 
@@ -62,7 +64,10 @@ export default function RedefinirSenhaPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, fontFamily: T.font,
-      display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+      display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", position: "relative" }}>
+      <div style={{ position: "absolute", top: "20px", right: "20px" }}>
+        <ThemeToggle tema={tema} onToggle={alternarTema} />
+      </div>
       <div style={{ width: "100%", maxWidth: "400px" }}>
         <div style={{ background: T.surface, borderRadius: T.radius, border: `1px solid ${T.border}`,
           boxShadow: T.shadow, padding: "32px" }}>
