@@ -273,6 +273,12 @@ function ConfigTab({ token }) {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
 
+  const [horarios, setHorarios] = useState({
+    atendimentoInicio: "", atendimentoFim: "", senhasInicio: "", senhasFim: "", diasAtendimento: [1, 2, 3, 4, 5],
+  });
+  const [horariosLoading, setHorariosLoading] = useState(false);
+  const [horariosMsg, setHorariosMsg] = useState(null);
+
   useEffect(() => {
     fetch(`${API}/api/config/tempo`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -282,6 +288,10 @@ function ConfigTab({ token }) {
         setTempo(d.tempo_medio_atendimento);
         setNovoTempo(String(d.tempo_medio_atendimento));
       });
+
+    fetch(`${API}/api/config/horarios`)
+      .then(r => r.json())
+      .then(setHorarios);
   }, [token]);
 
   const salvar = async () => {
@@ -306,6 +316,29 @@ function ConfigTab({ token }) {
       setMsg({ text: e.message, type: "error" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const salvarHorarios = async () => {
+    if (!horarios.diasAtendimento || horarios.diasAtendimento.length === 0) {
+      setHorariosMsg({ text: "Selecione ao menos um dia de atendimento.", type: "error" });
+      return;
+    }
+    setHorariosLoading(true);
+    setHorariosMsg(null);
+    try {
+      const res = await fetch(`${API}/api/config/horarios`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(horarios),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.erro || "Erro ao salvar horários");
+      setHorariosMsg({ text: "Horários atualizados com sucesso!", type: "ok" });
+    } catch (e) {
+      setHorariosMsg({ text: e.message, type: "error" });
+    } finally {
+      setHorariosLoading(false);
     }
   };
 
@@ -347,6 +380,80 @@ function ConfigTab({ token }) {
 
         <Btn variant="primary" onClick={salvar} disabled={loading}>
           {loading ? "Salvando..." : "Salvar alteração"}
+        </Btn>
+      </Card>
+
+      <Card style={{ maxWidth: "480px", marginTop: "20px" }}>
+        <p style={{ fontSize: "11px", fontWeight: "600", color: T.muted, letterSpacing: "0.08em",
+          textTransform: "uppercase", margin: "0 0 6px" }}>Horários de funcionamento</p>
+        <p style={{ fontSize: "13px", color: T.muted, margin: "0 0 20px" }}>
+          Fora dos dias e horários selecionados, o sistema bloqueia automaticamente
+          a retirada de senhas e a chamada de novas senhas pelos atendentes.
+        </p>
+
+        {horariosMsg && <Toast msg={horariosMsg} />}
+
+        <p style={{ fontSize: "12px", fontWeight: "700", color: T.text, margin: "0 0 10px" }}>
+          Dias de atendimento
+        </p>
+        <div style={{ display: "flex", gap: "6px", marginBottom: "24px" }}>
+          {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((label, i) => {
+            const ativo = horarios.diasAtendimento.includes(i);
+            return (
+              <button
+                key={i}
+                onClick={() => setHorarios(h => ({
+                  ...h,
+                  diasAtendimento: ativo
+                    ? h.diasAtendimento.filter(d => d !== i)
+                    : [...h.diasAtendimento, i].sort(),
+                }))}
+                style={{
+                  width: "42px", height: "42px", borderRadius: "8px", cursor: "pointer",
+                  fontFamily: T.font, fontSize: "12px", fontWeight: "700",
+                  border: ativo ? `1.5px solid ${T.accent}` : `1.5px solid ${T.border}`,
+                  background: ativo ? T.accentLt : T.bg,
+                  color: ativo ? T.accent : T.muted,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        <p style={{ fontSize: "12px", fontWeight: "700", color: T.text, margin: "0 0 10px" }}>
+          Retirada de senhas
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
+          <input type="time" value={horarios.senhasInicio}
+            onChange={e => setHorarios(h => ({ ...h, senhasInicio: e.target.value }))}
+            style={{ padding: "10px 12px", border: `1.5px solid ${T.border}`, borderRadius: "8px",
+              fontFamily: T.font, fontSize: "14px", color: T.text, background: T.bg, outline: "none" }} />
+          <span style={{ color: T.muted, fontSize: "13px" }}>até</span>
+          <input type="time" value={horarios.senhasFim}
+            onChange={e => setHorarios(h => ({ ...h, senhasFim: e.target.value }))}
+            style={{ padding: "10px 12px", border: `1.5px solid ${T.border}`, borderRadius: "8px",
+              fontFamily: T.font, fontSize: "14px", color: T.text, background: T.bg, outline: "none" }} />
+        </div>
+
+        <p style={{ fontSize: "12px", fontWeight: "700", color: T.text, margin: "0 0 10px" }}>
+          Atendimento (chamada de senhas)
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "24px" }}>
+          <input type="time" value={horarios.atendimentoInicio}
+            onChange={e => setHorarios(h => ({ ...h, atendimentoInicio: e.target.value }))}
+            style={{ padding: "10px 12px", border: `1.5px solid ${T.border}`, borderRadius: "8px",
+              fontFamily: T.font, fontSize: "14px", color: T.text, background: T.bg, outline: "none" }} />
+          <span style={{ color: T.muted, fontSize: "13px" }}>até</span>
+          <input type="time" value={horarios.atendimentoFim}
+            onChange={e => setHorarios(h => ({ ...h, atendimentoFim: e.target.value }))}
+            style={{ padding: "10px 12px", border: `1.5px solid ${T.border}`, borderRadius: "8px",
+              fontFamily: T.font, fontSize: "14px", color: T.text, background: T.bg, outline: "none" }} />
+        </div>
+
+        <Btn variant="primary" onClick={salvarHorarios} disabled={horariosLoading}>
+          {horariosLoading ? "Salvando..." : "Salvar horários"}
         </Btn>
       </Card>
     </div>

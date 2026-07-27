@@ -45,10 +45,11 @@ router.get("/historico", admin, controller.historicoPorData);
 
 /* ===================== PÚBLICO ===================== */
 router.get("/fila", controller.filaPublica);
-
+router.get("/config/horarios",     configController.getHorarios);
 
 
 router.get("/config/tempo",        admin, configController.getTempo);
 router.put("/config/tempo",        admin, configController.setTempo);
+router.put("/config/horarios",     admin, configController.setHorarios);
 
 module.exports = router;

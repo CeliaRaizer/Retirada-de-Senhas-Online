@@ -1,4 +1,16 @@
 const model = require("../models/senhaModel");
+const configModel = require("../models/configModel");
+
+const NOMES_DIA = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+
+// "HH:MM" no horário local do servidor
+function horaAtual() {
+    return new Date().toTimeString().slice(0, 5);
+}
+
+function diaAtual() {
+    return new Date().getDay(); // 0 = domingo ... 6 = sábado
+}
 
 /* =====================================
    CRIAR SENHA
@@ -10,6 +22,21 @@ exports.criar = async (req, res) => {
 
         if (!tipo || !["normal", "prioritario"].includes(tipo)) {
             return res.status(400).json({ erro: "Tipo de senha inválido" });
+        }
+
+        const { senhasInicio, senhasFim, diasAtendimento } = await configModel.getHorarios();
+
+        if (!diasAtendimento.includes(diaAtual())) {
+            return res.status(403).json({
+                erro: `Não há atendimento neste dia (${NOMES_DIA[diaAtual()]}).`
+            });
+        }
+
+        const agora = horaAtual();
+        if (agora < senhasInicio || agora > senhasFim) {
+            return res.status(403).json({
+                erro: `Fora do horário de retirada de senhas (das ${senhasInicio} às ${senhasFim}).`
+            });
         }
 
         const senha = await model.criarSenha(tipo, usuario.email);
@@ -40,6 +67,21 @@ exports.criarAnonima = async (req, res) => {
 
         if (!dispositivoId || typeof dispositivoId !== "string") {
             return res.status(400).json({ erro: "dispositivoId é obrigatório" });
+        }
+
+        const { senhasInicio, senhasFim, diasAtendimento } = await configModel.getHorarios();
+
+        if (!diasAtendimento.includes(diaAtual())) {
+            return res.status(403).json({
+                erro: `Não há atendimento neste dia (${NOMES_DIA[diaAtual()]}).`
+            });
+        }
+
+        const agora = horaAtual();
+        if (agora < senhasInicio || agora > senhasFim) {
+            return res.status(403).json({
+                erro: `Fora do horário de retirada de senhas (das ${senhasInicio} às ${senhasFim}).`
+            });
         }
 
         const resultado = await model.criarSenhaAnonima(tipo, dispositivoId);
@@ -138,6 +180,21 @@ exports.listar = async (req, res) => {
 ===================================== */
 exports.chamar = async (req, res) => {
     try {
+        const { atendimentoInicio, atendimentoFim, diasAtendimento } = await configModel.getHorarios();
+
+        if (!diasAtendimento.includes(diaAtual())) {
+            return res.status(403).json({
+                erro: `Não há atendimento neste dia (${NOMES_DIA[diaAtual()]}).`
+            });
+        }
+
+        const agora = horaAtual();
+        if (agora < atendimentoInicio || agora > atendimentoFim) {
+            return res.status(403).json({
+                erro: `Fora do horário de atendimento (das ${atendimentoInicio} às ${atendimentoFim}).`
+            });
+        }
+
         const atendenteId = req.usuario?.perfil === "atendente" ? req.usuario.id : null;
         const senha = await model.chamarProxima(atendenteId);
 
