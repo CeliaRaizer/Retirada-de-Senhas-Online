@@ -6,7 +6,8 @@ const atendenteModel = require("../models/atendenteModel");
 const clienteModel = require("../models/clienteModel");
 const { enviarEmail } = require("../services/emailService");
 
-const FRONTEND_URL = "http://localhost:5173";
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const BACKEND_URL  = process.env.BACKEND_URL  || "http://localhost:3000";
 const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function gerarToken() {
@@ -49,11 +50,11 @@ exports.callback = async (req, res) => {
             { expiresIn: "1d" }
         );
 
-        res.redirect(`http://localhost:5173?token=${token}`);
+        res.redirect(`${FRONTEND_URL}?token=${token}`);
 
     } catch (err) {
         console.error("Erro no login Google:", err);
-        res.redirect(`http://localhost:5173?erro=login_google_falhou`);
+        res.redirect(`${FRONTEND_URL}?erro=login_google_falhou`);
     }
 };
 
@@ -216,7 +217,7 @@ exports.registrarCliente = async (req, res) => {
             nome, email, senhaHash, tokenVerificacao, tokenExpira
         );
 
-        const linkVerificacao = `http://localhost:3000/auth/cliente/verificar?token=${tokenVerificacao}`;
+        const linkVerificacao = `${BACKEND_URL}/auth/cliente/verificar?token=${tokenVerificacao}`;
 
         await enviarEmail({
             to: email,
@@ -295,7 +296,7 @@ exports.reenviarVerificacao = async (req, res) => {
 
             await clienteModel.salvarTokenVerificacao(cliente.id, tokenVerificacao, tokenExpira);
 
-            const linkVerificacao = `http://localhost:3000/auth/cliente/verificar?token=${tokenVerificacao}`;
+            const linkVerificacao = `${BACKEND_URL}/auth/cliente/verificar?token=${tokenVerificacao}`;
 
             await enviarEmail({
                 to: email,

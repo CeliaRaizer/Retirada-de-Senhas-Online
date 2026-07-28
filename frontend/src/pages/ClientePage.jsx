@@ -7,8 +7,8 @@ import { io } from "socket.io-client";
 import { QRCodeSVG } from "qrcode.react";
 import { useTema, ThemeToggle } from "../theme";
 
-const API = "http://localhost:3000";
-const FRONTEND_URL = "http://localhost:5173";
+const API = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
+const FRONTEND_URL = typeof window !== "undefined" ? window.location.origin : "http://localhost:5173";
 
 export const T = {
   bg:       "var(--rs-bg)",
@@ -464,7 +464,7 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
   useEffect(() => {
     if (!ticketVisitante) return;
     buscarStatusVisitante(ticketVisitante);
-    const socket = io(API);
+    const socket = io(API || undefined);
     socket.on("filaAtualizada", () => buscarStatusVisitante(ticketVisitante));
     socket.on("senhaChamada", () => buscarStatusVisitante(ticketVisitante));
     return () => socket.disconnect();
@@ -949,7 +949,8 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
       </div>
 
       <p style={{ textAlign: "center", color: T.muted, fontSize: "12px", padding: "20px", margin: 0 }}>
-        Retirada de Senhas · Sistema de atendimento online {" "}
+        Retirada de Senhas · Sistema de atendimento online ·{" "}
+        <a href="/admin" style={{ color: T.muted }}>painel admin</a>
       </p>
     </div>
   );
@@ -997,7 +998,7 @@ function PainelCliente({ token, onLogout }) {
 
   useEffect(() => {
     buscarMinha();
-    const socket = io(API);
+    const socket = io(API || undefined);
     socket.on("filaAtualizada", () => { buscarMinha(); buscarFila(); });
     socket.on("senhaChamada",   () => { buscarMinha(); buscarFila(); });
     return () => socket.disconnect();

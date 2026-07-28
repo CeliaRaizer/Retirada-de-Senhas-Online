@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { useTema, ThemeToggle } from "../theme";
 
-const API = "http://localhost:3000";
+const API = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 const T = {
   bg: "var(--rs-bg)", surface: "var(--rs-surface)", border: "var(--rs-border)", text: "var(--rs-text)",

@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 
-const API = "http://localhost:3000";
+const API = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 /* ---------- paleta / tokens ---------- */
 const P = {
@@ -130,7 +130,7 @@ export default function TelaoPage() {
     };
     carregarFila();
 
-    const socket = io(API);
+    const socket = io(API || undefined);
     socket.on("connect",    () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
     socket.on("senhaChamada", s => {

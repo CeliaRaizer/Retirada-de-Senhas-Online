@@ -8,7 +8,7 @@ import { io } from "socket.io-client";
 import { ModalConfirmar } from "./ClientePage";
 import { useTema, ThemeToggle } from "../theme";
 
-const API = "http://localhost:3000";
+const API = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 const T = {
   bg:       "var(--rs-bg)",
@@ -215,7 +215,7 @@ function PainelAtendente({ token, onLogout }) {
 
   useEffect(() => {
     carregar();
-    const socket = io(API);
+    const socket = io(API || undefined);
     socket.on("filaAtualizada", carregar);
     socket.on("senhaChamada", carregar);
     socket.on("fila_resetada", carregar);

@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback } from "react";
 import { io } from "socket.io-client";
 import { T, Card, Btn, Toast, NavFluxo, CardMinhaSenha, ModalConfirmar, injectFont } from "./ClientePage";
 
-const API = "http://localhost:3000";
+const API = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
 export default function AcompanharPage() {
   injectFont();
@@ -43,7 +43,7 @@ export default function AcompanharPage() {
 
   useEffect(() => {
     buscarStatus();
-    const socket = io(API);
+    const socket = io(API || undefined);
     socket.on("filaAtualizada", buscarStatus);
     socket.on("senhaChamada", buscarStatus);
     return () => socket.disconnect();

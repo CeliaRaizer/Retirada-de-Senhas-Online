@@ -1,10 +1,11 @@
 const mysql = require("mysql2");
 
 const db = mysql.createPool({
-    host:               "localhost",
-    user:               "root",
-    password:           "celia",
-    database:           "bdsenha",
+    host:               process.env.DB_HOST || "localhost",
+    port:               process.env.DB_PORT || 3306,
+    user:               process.env.DB_USER || "root",
+    password:           process.env.DB_PASSWORD ?? "celia",
+    database:           process.env.DB_NAME || "bdsenha",
     waitForConnections: true,   // aguarda conexão disponível em vez de dar erro
     connectionLimit:    10,     // máximo de conexões simultâneas
     queueLimit:         0       // fila ilimitada

@@ -4,6 +4,11 @@ const cors = require("cors");
 
 const app = express();
 
+// Atrás do Nginx (proxy reverso), sem isso o Express não enxerga o IP
+// real do cliente nem o protocolo original — afeta o rate limit por IP
+// e a URL de callback do login Google.
+app.set("trust proxy", 1);
+
 app.use(cors());
 app.use(express.json());
 

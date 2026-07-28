@@ -8,3 +8,10 @@ yarn-debug.log*
 yarn-error.log*
 coverage/
 .DS_Store
+
+# Backups de banco de dados (dados reais de usuários/senhas — nunca versionar)
+*.sql
+!backend/db/init.sql
+
+# Arquivo com credenciais de acesso (admin, atendentes, etc.)
+ACESSOS.md
