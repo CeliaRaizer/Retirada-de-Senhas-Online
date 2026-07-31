@@ -1,5 +1,6 @@
 // src/server.js
 require("dotenv").config();
+console.log("DEBUG EMAIL_USER:", JSON.stringify(process.env.EMAIL_USER));
 
 const app = require("./app");
 const http = require("http");

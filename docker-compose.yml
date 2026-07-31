@@ -5,6 +5,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-celia}
       MYSQL_DATABASE: ${DB_NAME:-bdsenha}
+      TZ: America/Sao_Paulo
     volumes:
       - db_data:/var/lib/mysql
       # Só roda na primeira vez que o volume é criado (banco vazio).
@@ -28,6 +29,7 @@ services:
         condition: service_healthy
     environment:
       PORT: 3000
+      TZ: America/Sao_Paulo
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no arquivo .env}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
       BACKEND_URL: ${BACKEND_URL:-http://localhost}
@@ -38,6 +40,8 @@ services:
       DB_NAME: ${DB_NAME:-bdsenha}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASS: ${EMAIL_PASS:-}
     ports:
       - "3000:3000"
 

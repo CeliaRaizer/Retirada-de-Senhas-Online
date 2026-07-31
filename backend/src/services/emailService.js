@@ -1,29 +1,47 @@
 const nodemailer = require("nodemailer");
 
 /*
- * Ethereal é um serviço de teste do próprio Nodemailer: nenhum email
- * chega numa caixa real. Em vez disso, cada envio gera um link de
- * "preview" que aparece no console — abre no navegador pra ver o
- * email como se fosse um webmail.
+ * Envio real via Gmail (SMTP), usando uma senha de app do Google
+ * (não a senha normal da conta). 
  *
- * A conta de teste é criada uma única vez (não a cada email), na
- * primeira vez que alguém chama enviarEmail().
+ * Como gerar a senha de app: https://myaccount.google.com/apppasswords
+ * (precisa ter a verificação em duas etapas ativada na conta Google).
+ *
+ * Se essas variáveis não estiverem definidas, cai de volta pro Ethereal
+ * (serviço de teste do Nodemailer, não entrega de verdade) só para não
+ * travar o desenvolvimento local sem configuração nenhuma.
  */
 let transporterPromise = null;
+let usandoEthereal = false;
 
 function getTransporter() {
     if (!transporterPromise) {
-        transporterPromise = nodemailer.createTestAccount().then(conta => {
-            console.log("\n📧 Conta de teste Ethereal criada (só informativo, não precisa usar):");
-            console.log("   usuário:", conta.user);
+        const { EMAIL_USER, EMAIL_PASS } = process.env;
 
-            return nodemailer.createTransport({
-                host: "smtp.ethereal.email",
-                port: 587,
-                secure: false,
-                auth: { user: conta.user, pass: conta.pass }
+        if (EMAIL_USER && EMAIL_PASS) {
+            transporterPromise = Promise.resolve(
+                nodemailer.createTransport({
+                    service: "gmail",
+                    auth: { user: EMAIL_USER, pass: EMAIL_PASS }
+                })
+            );
+        } else {
+            usandoEthereal = true;
+            console.warn(
+                "\n⚠️  EMAIL_USER/EMAIL_PASS não configurados no .env — usando Ethereal (e-mails NÃO são entregues de verdade)."
+            );
+            transporterPromise = nodemailer.createTestAccount().then(conta => {
+                console.log("📧 Conta de teste Ethereal criada (só informativo, não precisa usar):");
+                console.log("   usuário:", conta.user);
+
+                return nodemailer.createTransport({
+                    host: "smtp.ethereal.email",
+                    port: 587,
+                    secure: false,
+                    auth: { user: conta.user, pass: conta.pass }
+                });
             });
-        });
+        }
     }
     return transporterPromise;
 }
@@ -31,20 +49,22 @@ function getTransporter() {
 exports.enviarEmail = async ({ to, subject, html }) => {
     const transporter = await getTransporter();
 
-    const info = await transporter.sendMail({
-        from: '"Retirada de Senhas" <no-reply@retiradadesenhas.com>',
-        to,
-        subject,
-        html
-    });
+    const remetente = usandoEthereal
+        ? '"Retirada de Senhas" <no-reply@retiradadesenhas.com>'
+        : `"Retirada de Senhas" <${process.env.EMAIL_USER}>`;
 
-    const previewUrl = nodemailer.getTestMessageUrl(info);
+    const info = await transporter.sendMail({ from: remetente, to, subject, html });
 
-    console.log("\n📧 ===================================");
-    console.log("   Email:", subject);
-    console.log("   Para:", to);
-    console.log("   Preview:", previewUrl);
-    console.log("===================================\n");
+    if (usandoEthereal) {
+        const previewUrl = nodemailer.getTestMessageUrl(info);
+        console.log("\n📧 ===================================");
+        console.log("   Email:", subject);
+        console.log("   Para:", to);
+        console.log("   Preview:", previewUrl);
+        console.log("===================================\n");
+        return { previewUrl };
+    }
 
-    return { previewUrl };
+    console.log(`📧 Email "${subject}" enviado para ${to} (messageId: ${info.messageId})`);
+    return { messageId: info.messageId };
 };
