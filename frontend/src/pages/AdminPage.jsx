@@ -268,10 +268,12 @@ function HistoricoTab({ token }) {
 
 /* ==================== CONFIGURAÇÕES TAB ==================== */
 function ConfigTab({ token }) {
-  const [tempo, setTempo] = useState(null);
-  const [novoTempo, setNovoTempo] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState(null);
+  const [tempoInfo, setTempoInfo] = useState(null);
+  const [tempoLoading, setTempoLoading] = useState(true);
+  const [modoManual, setModoManual] = useState(false);
+  const [valorManual, setValorManual] = useState("");
+  const [tempoMsg, setTempoMsg] = useState(null);
+  const [tempoSalvando, setTempoSalvando] = useState(false);
 
   const [horarios, setHorarios] = useState({
     atendimentoInicio: "", atendimentoFim: "", senhasInicio: "", senhasFim: "", diasAtendimento: [1, 2, 3, 4, 5],
@@ -285,23 +287,32 @@ function ConfigTab({ token }) {
     })
       .then(r => r.json())
       .then(d => {
-        setTempo(d.tempo_medio_atendimento);
-        setNovoTempo(String(d.tempo_medio_atendimento));
-      });
+        setTempoInfo(d);
+        setModoManual(d.overrideAtivo);
+        setValorManual(String(d.overrideAtivo ? d.overrideMinutos : d.automatico.minutos));
+        setTempoLoading(false);
+      })
+      .catch(() => setTempoLoading(false));
 
     fetch(`${API}/api/config/horarios`)
       .then(r => r.json())
       .then(setHorarios);
   }, [token]);
 
-  const salvar = async () => {
-    const val = parseInt(novoTempo);
-    if (!val || val < 1 || val > 120) {
-      setMsg({ text: "Informe um valor entre 1 e 120 minutos.", type: "error" });
+  const formatarData = (iso) => {
+    if (!iso) return "";
+    const [ano, mes, dia] = iso.split("-");
+    return `${dia}/${mes}`;
+  };
+
+  const salvarAjusteManual = async () => {
+    const val = parseInt(valorManual, 10);
+    if (!val || val < 1 || val > 180) {
+      setTempoMsg({ text: "Informe um valor entre 1 e 180 minutos.", type: "error" });
       return;
     }
-    setLoading(true);
-    setMsg(null);
+    setTempoSalvando(true);
+    setTempoMsg(null);
     try {
       const res = await fetch(`${API}/api/config/tempo`, {
         method: "PUT",
@@ -310,12 +321,33 @@ function ConfigTab({ token }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.erro || "Erro ao salvar");
-      setTempo(val);
-      setMsg({ text: "Tempo atualizado com sucesso!", type: "ok" });
+      setTempoMsg({ text: "Ajuste manual aplicado!", type: "ok" });
+      setTempoInfo(info => ({ ...info, tempo_medio_atendimento: val, overrideAtivo: true, overrideMinutos: val }));
     } catch (e) {
-      setMsg({ text: e.message, type: "error" });
+      setTempoMsg({ text: e.message, type: "error" });
     } finally {
-      setLoading(false);
+      setTempoSalvando(false);
+    }
+  };
+
+  const voltarAutomatico = async () => {
+    setTempoSalvando(true);
+    setTempoMsg(null);
+    try {
+      const res = await fetch(`${API}/api/config/tempo`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ minutos: null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.erro || "Erro ao voltar ao automático");
+      setModoManual(false);
+      setTempoMsg({ text: "Voltou a usar o cálculo automático.", type: "ok" });
+      setTempoInfo(info => ({ ...info, tempo_medio_atendimento: info.automatico.minutos, overrideAtivo: false, overrideMinutos: null }));
+    } catch (e) {
+      setTempoMsg({ text: e.message, type: "error" });
+    } finally {
+      setTempoSalvando(false);
     }
   };
 
@@ -351,36 +383,73 @@ function ConfigTab({ token }) {
           textTransform: "uppercase", margin: "0 0 6px" }}>Tempo médio por atendimento</p>
         <p style={{ fontSize: "13px", color: T.muted, margin: "0 0 20px" }}>
           Usado para calcular o tempo estimado de espera exibido ao cliente.
+          Calculado automaticamente com base no atendimento do dia anterior,
+          mas você pode ajustar manualmente quando precisar (ex: médico atrasado ou adiantado hoje).
         </p>
 
-        {msg && <Toast msg={msg} />}
-
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
-          <input
-            type="number"
-            min="1"
-            max="120"
-            value={novoTempo}
-            onChange={e => setNovoTempo(e.target.value)}
-            style={{
-              width: "100px", padding: "12px 14px", boxSizing: "border-box",
-              border: `1.5px solid ${T.border}`, borderRadius: "8px",
-              fontFamily: T.font, fontSize: "20px", fontWeight: "700",
-              color: T.accent, textAlign: "center", outline: "none",
-            }}
-          />
-          <span style={{ fontSize: "14px", color: T.muted }}>minutos por pessoa</span>
-        </div>
-
-        {tempo !== null && (
-          <p style={{ fontSize: "12px", color: T.muted, margin: "0 0 20px" }}>
-            Valor atual: <strong style={{ color: T.text }}>{tempo} min</strong>
-          </p>
+        {tempoLoading && (
+          <p style={{ fontSize: "14px", color: T.muted }}>Calculando...</p>
         )}
 
-        <Btn variant="primary" onClick={salvar} disabled={loading}>
-          {loading ? "Salvando..." : "Salvar alteração"}
-        </Btn>
+        {!tempoLoading && tempoInfo && (
+          <>
+            {tempoMsg && <Toast msg={tempoMsg} />}
+
+            <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "6px" }}>
+              <span style={{ fontSize: "32px", fontWeight: "800", color: T.accent }}>
+                {tempoInfo.tempo_medio_atendimento}
+              </span>
+              <span style={{ fontSize: "14px", color: T.muted }}>minutos por pessoa</span>
+            </div>
+
+            <p style={{ fontSize: "12px", color: T.muted, margin: "0 0 18px" }}>
+              {tempoInfo.overrideAtivo
+                ? "Valor ajustado manualmente pelo admin (em uso agora, no lugar do cálculo automático)."
+                : tempoInfo.automatico.calculado
+                  ? <>Calculado automaticamente com base em <strong style={{ color: T.text }}>{tempoInfo.automatico.amostras}</strong> atendimento(s) do dia {formatarData(tempoInfo.automatico.dia)}.</>
+                  : `Ainda não há atendimentos suficientes no histórico recente — usando um valor padrão de ${tempoInfo.tempo_medio_atendimento} min.`}
+            </p>
+
+            {!modoManual && (
+              <Btn variant="outline" onClick={() => setModoManual(true)}>Ajustar manualmente</Btn>
+            )}
+
+            {modoManual && (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+                  <input
+                    type="number"
+                    min="1"
+                    max="180"
+                    value={valorManual}
+                    onChange={e => setValorManual(e.target.value)}
+                    style={{
+                      width: "100px", padding: "12px 14px", boxSizing: "border-box",
+                      border: `1.5px solid ${T.border}`, borderRadius: "8px",
+                      fontFamily: T.font, fontSize: "20px", fontWeight: "700",
+                      color: T.accent, textAlign: "center", outline: "none",
+                    }}
+                  />
+                  <span style={{ fontSize: "14px", color: T.muted }}>minutos por pessoa</span>
+                </div>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <Btn variant="primary" onClick={salvarAjusteManual} disabled={tempoSalvando}>
+                    {tempoSalvando ? "Salvando..." : "Aplicar ajuste"}
+                  </Btn>
+                  {tempoInfo.overrideAtivo ? (
+                    <Btn variant="outline" onClick={voltarAutomatico} disabled={tempoSalvando}>
+                      Voltar ao automático
+                    </Btn>
+                  ) : (
+                    <Btn variant="outline" onClick={() => setModoManual(false)} disabled={tempoSalvando}>
+                      Cancelar
+                    </Btn>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </Card>
 
       <Card style={{ maxWidth: "480px", marginTop: "20px" }}>

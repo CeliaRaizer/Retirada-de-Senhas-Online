@@ -1,24 +1,98 @@
 const db = require("../config/db");
 
-exports.getTempo = () => {
-    return new Promise((resolve, reject) => {
-        db.query("SELECT valor FROM configuracoes WHERE chave = 'tempo_medio_atendimento'", (err, result) => {
-            if (err) return reject(err);
-            resolve(result.length > 0 ? parseInt(result[0].valor) : 5);
-        });
-    });
-};
+const MAX_DIAS_BUSCA = 14;
+const MINUTOS_PADRAO_SEM_DADOS = 5; // só usado se não houver NENHUM dia com dados no período de busca
+const CHAVE_OVERRIDE = "tempo_override_minutos";
 
-exports.setTempo = (minutos) => {
+function calcularMediaDiaAnterior() {
     return new Promise((resolve, reject) => {
         db.query(
-            "UPDATE configuracoes SET valor = ? WHERE chave = 'tempo_medio_atendimento'",
-            [minutos],
-            (err) => {
+            `SELECT dia_referencia, AVG(TIMESTAMPDIFF(MINUTE, chamado_em, finalizado_em)) AS media, COUNT(*) AS amostras
+             FROM senha
+             WHERE status = 'atendido'
+               AND chamado_em IS NOT NULL
+               AND finalizado_em IS NOT NULL
+               AND dia_referencia < CURDATE()
+               AND dia_referencia >= CURDATE() - INTERVAL ? DAY
+             GROUP BY dia_referencia
+             ORDER BY dia_referencia DESC
+             LIMIT 1`,
+            [MAX_DIAS_BUSCA],
+            (err, rows) => {
                 if (err) return reject(err);
-                resolve({ mensagem: `Tempo atualizado para ${minutos} minutos` });
+                if (rows.length === 0) {
+                    return resolve({ minutos: null, amostras: 0, dia: null });
+                }
+                const linha = rows[0];
+                resolve({
+                    minutos: Math.max(1, Math.round(Number(linha.media))),
+                    amostras: Number(linha.amostras),
+                    dia: linha.dia_referencia ? new Date(linha.dia_referencia).toISOString().slice(0, 10) : null,
+                });
             }
         );
+    });
+}
+
+function buscarOverride() {
+    return new Promise((resolve, reject) => {
+        db.query("SELECT valor FROM configuracoes WHERE chave = ?", [CHAVE_OVERRIDE], (err, rows) => {
+            if (err) return reject(err);
+            if (rows.length === 0 || rows[0].valor === "" || rows[0].valor === null) return resolve(null);
+            const num = parseInt(rows[0].valor, 10);
+            resolve(isNaN(num) ? null : num);
+        });
+    });
+}
+
+// Usado internamente (cálculo do tempo estimado de espera na fila) — só o número final em minutos.
+exports.getTempo = async () => {
+    const override = await buscarOverride();
+    if (override !== null) return override;
+
+    const automatico = await calcularMediaDiaAnterior();
+    return automatico.minutos !== null ? automatico.minutos : MINUTOS_PADRAO_SEM_DADOS;
+};
+
+// Usado pela tela de Configurações — mostra o valor em uso, de onde ele vem,
+// e o cálculo automático de referência (mesmo quando o ajuste manual está ativo).
+exports.getTempoDetalhado = async () => {
+    const [override, automatico] = await Promise.all([buscarOverride(), calcularMediaDiaAnterior()]);
+
+    const automaticoInfo = {
+        minutos: automatico.minutos !== null ? automatico.minutos : MINUTOS_PADRAO_SEM_DADOS,
+        calculado: automatico.minutos !== null,
+        amostras: automatico.amostras,
+        dia: automatico.dia,
+    };
+
+    return {
+        tempo_medio_atendimento: override !== null ? override : automaticoInfo.minutos,
+        overrideAtivo: override !== null,
+        overrideMinutos: override,
+        automatico: automaticoInfo,
+    };
+};
+
+// minutos = número -> ativa/atualiza o ajuste manual
+// minutos = null    -> remove o ajuste manual e volta a usar o cálculo automático
+exports.setOverride = (minutos) => {
+    return new Promise((resolve, reject) => {
+        if (minutos === null) {
+            db.query("DELETE FROM configuracoes WHERE chave = ?", [CHAVE_OVERRIDE], (err) => {
+                if (err) return reject(err);
+                resolve({ mensagem: "Voltou a usar o cálculo automático." });
+            });
+        } else {
+            db.query(
+                "INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)",
+                [CHAVE_OVERRIDE, String(minutos)],
+                (err) => {
+                    if (err) return reject(err);
+                    resolve({ mensagem: `Ajuste manual definido: ${minutos} minutos.` });
+                }
+            );
+        }
     });
 };
 

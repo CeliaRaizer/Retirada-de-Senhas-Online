@@ -264,7 +264,7 @@ exports.chamarProxima = (atendenteId = null) => {
         // operando a fila ao mesmo tempo sem um "roubar" o atendimento do outro.
         const sqlFinalizarAnterior = `
             UPDATE senha 
-            SET status = 'atendido' 
+            SET status = 'atendido', finalizado_em = NOW()
             WHERE status = 'chamando' 
               AND dia_referencia = CURDATE()
               AND (atendente_id <=> ?)
@@ -306,7 +306,7 @@ exports.chamarProxima = (atendenteId = null) => {
                 const senha = result[0];
 
                 db.query(
-                    `UPDATE senha SET status = 'chamando', atendente_id = ? WHERE id = ?`,
+                    `UPDATE senha SET status = 'chamando', atendente_id = ?, chamado_em = NOW() WHERE id = ?`,
                     [atendenteId, senha.id],
                     (err) => {
                         if (err) return reject(err);
@@ -330,7 +330,7 @@ exports.chamarProxima = (atendenteId = null) => {
 =================================================== */
 exports.finalizarSenha = (id) => {
     return new Promise((resolve, reject) => {
-        db.query(`UPDATE senha SET status = 'atendido' WHERE id = ?`, [id], (err) => {
+        db.query(`UPDATE senha SET status = 'atendido', finalizado_em = NOW() WHERE id = ?`, [id], (err) => {
             if (err) return reject(err);
             resolve({ mensagem: "Senha finalizada" });
         });

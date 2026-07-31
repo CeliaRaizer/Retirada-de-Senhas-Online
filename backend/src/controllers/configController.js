@@ -2,20 +2,30 @@ const configModel = require("../models/configModel");
 
 exports.getTempo = async (req, res) => {
     try {
-        const tempo = await configModel.getTempo();
-        res.json({ tempo_medio_atendimento: tempo });
+        const tempo = await configModel.getTempoDetalhado();
+        res.json(tempo);
     } catch (err) {
         res.status(500).json({ erro: err.message });
     }
 };
 
+// Ajuste manual pontual (ex: médico atrasado/adiantado hoje).
+// minutos = null/vazio remove o ajuste e volta ao cálculo automático.
 exports.setTempo = async (req, res) => {
     try {
         const { minutos } = req.body;
-        if (!minutos || isNaN(minutos) || minutos < 1) {
-            return res.status(400).json({ erro: "Informe um valor válido em minutos" });
+
+        if (minutos === null || minutos === undefined || minutos === "") {
+            const resultado = await configModel.setOverride(null);
+            return res.json(resultado);
         }
-        const resultado = await configModel.setTempo(parseInt(minutos));
+
+        const valor = parseInt(minutos, 10);
+        if (isNaN(valor) || valor < 1 || valor > 180) {
+            return res.status(400).json({ erro: "Informe um valor válido em minutos (1 a 180), ou nenhum valor para voltar ao automático." });
+        }
+
+        const resultado = await configModel.setOverride(valor);
         res.json(resultado);
     } catch (err) {
         res.status(500).json({ erro: err.message });
