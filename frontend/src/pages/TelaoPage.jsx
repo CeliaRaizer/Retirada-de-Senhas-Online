@@ -6,6 +6,9 @@
  * A senha chamada "vira" como as antigas placas mecânicas de horários —
  * é uma linguagem visual que qualquer pessoa numa sala de espera já
  * reconhece de longe: "preste atenção, algo acabou de mudar aqui".
+ *
+ * Suporta múltiplos guichês chamando ao mesmo tempo (um bloco por
+ * atendente ativo) e um alerta sonoro (dois tons) a cada nova chamada.
  */
 import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
@@ -39,6 +42,26 @@ const injectFonts = () => {
   document.head.appendChild(l);
 };
 
+/* Toca um "ding-dong" de dois tons — o clássico som de anúncio de painel.
+   Sintetizado na hora (Web Audio API), sem precisar de nenhum arquivo de áudio. */
+function tocarBeep(ctx) {
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  [880, 1320].forEach((freq, i) => {
+    const inicio = now + i * 0.2;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, inicio);
+    gain.gain.linearRampToValueAtTime(0.28, inicio + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, inicio + 0.4);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(inicio);
+    osc.stop(inicio + 0.42);
+  });
+}
+
 /* ---------- uma "aba" do painel mecânico (uma letra/dígito) ---------- */
 function FlipChar({ char, flipId, size = 1 }) {
   const w = `clamp(${52 * size}px, ${7 * size}vw, ${112 * size}px)`;
@@ -70,48 +93,65 @@ function FlipChar({ char, flipId, size = 1 }) {
   );
 }
 
-function PainelSenha({ senha, flipId }) {
-  if (!senha) {
-    return (
-      <div style={{ textAlign: "center", opacity: 0.35 }}>
-        <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginBottom: "22px" }}>
-          {["–", "–", "–", "–"].map((c, i) => <FlipChar key={i} char={c} flipId={`idle-${i}`} />)}
-        </div>
-        <p style={{ fontFamily: P.fontDisplay, letterSpacing: "0.35em", textTransform: "uppercase",
-          fontSize: "clamp(11px, 1.1vw, 15px)", color: P.muted, margin: 0 }}>
-          Aguardando chamada
-        </p>
-      </div>
-    );
-  }
-
-  const chars = String(senha.numero).split("");
+/* Idle: nenhum guichê chamando no momento */
+function PainelVazio() {
   return (
-    <div style={{ textAlign: "center" }}>
-      <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginBottom: "26px" }}>
-        {chars.map((c, i) => <FlipChar key={i} char={c} flipId={`${flipId}-${i}`} />)}
+    <div style={{ textAlign: "center", opacity: 0.35 }}>
+      <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginBottom: "22px" }}>
+        {["–", "–", "–", "–"].map((c, i) => <FlipChar key={i} char={c} flipId={`idle-${i}`} />)}
       </div>
-      <span style={{
-        display: "inline-flex", alignItems: "center", gap: "8px", fontFamily: P.fontDisplay,
-        fontWeight: 700, letterSpacing: "0.3em", textTransform: "uppercase",
-        fontSize: "clamp(11px, 1.1vw, 15px)",
-        color: senha.tipo === "prioritario" ? P.amber : P.muted,
-      }}>
-        {senha.tipo === "prioritario" ? "★ Atendimento prioritário" : "Atendimento normal"}
-      </span>
+      <p style={{ fontFamily: P.fontDisplay, letterSpacing: "0.35em", textTransform: "uppercase",
+        fontSize: "clamp(11px, 1.1vw, 15px)", color: P.muted, margin: 0 }}>
+        Aguardando chamada
+      </p>
     </div>
   );
 }
 
+/* Um bloco de senha chamada — dimensiona conforme quantos guichês
+   estão ativos ao mesmo tempo (menor quando há mais de um). */
+function PainelSenha({ senha, size }) {
+  const chars = String(senha.numero).split("");
+  return (
+    <div style={{ textAlign: "center" }}>
+      <div style={{ display: "flex", gap: `${8 * size}px`, justifyContent: "center", marginBottom: `${20 * size}px` }}>
+        {chars.map((c, i) => <FlipChar key={i} char={c} flipId={`${senha.id}-${i}`} size={size} />)}
+      </div>
+      <span style={{
+        display: "inline-flex", alignItems: "center", gap: "8px", fontFamily: P.fontDisplay,
+        fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase",
+        fontSize: `clamp(${10 * size}px, ${1.1 * size}vw, ${14 * size}px)`,
+        color: senha.tipo === "prioritario" ? P.amber : P.muted,
+      }}>
+        {senha.tipo === "prioritario" ? "★ Prioritário" : "Normal"}
+      </span>
+      {senha.atendente_nome && (
+        <p style={{ margin: "6px 0 0", fontFamily: P.fontMono, letterSpacing: "0.05em",
+          fontSize: `clamp(${11 * size}px, ${1.1 * size}vw, ${15 * size}px)`, color: P.ink }}>
+          Guichê — {senha.atendente_nome}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* Ajusta o tamanho dos blocos conforme quantos guichês chamam ao mesmo tempo */
+function tamanhoPara(qtd) {
+  if (qtd <= 1) return 1;
+  if (qtd === 2) return 0.68;
+  if (qtd === 3) return 0.54;
+  return 0.44;
+}
+
 export default function TelaoPage() {
-  const [atual, setAtual]         = useState(null);
+  const [chamadas, setChamadas]   = useState([]); // uma por guichê ativo
   const [proximas, setProximas]   = useState([]);
   const [hist, setHist]           = useState([]);
   const [total, setTotal]         = useState(0);
   const [connected, setConnected] = useState(false);
   const [hora, setHora]           = useState(new Date().toLocaleTimeString("pt-BR"));
-  const flipCount = useRef(0);
-  const [flipId, setFlipId]       = useState(0);
+  const [somAtivo, setSomAtivo]   = useState(false);
+  const audioCtxRef = useRef(null);
 
   useEffect(() => { injectFonts(); }, []);
 
@@ -120,12 +160,22 @@ export default function TelaoPage() {
     return () => clearInterval(t);
   }, []);
 
+  const ativarSom = () => {
+    if (!audioCtxRef.current) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      audioCtxRef.current = new Ctx();
+    }
+    if (audioCtxRef.current.state === "suspended") audioCtxRef.current.resume();
+    tocarBeep(audioCtxRef.current); // beep de confirmação
+    setSomAtivo(true);
+  };
+
   useEffect(() => {
     const carregarFila = () => {
       fetch(`${API}/api/fila`).then(r => r.json()).then(d => {
         setTotal(d.totalNaFila || 0);
         setProximas((d.fila || []).slice(0, 5));
-        if (d.chamando) setAtual(d.chamando);
+        setChamadas(d.chamadas || []);
       }).catch(() => {});
     };
     carregarFila();
@@ -134,13 +184,25 @@ export default function TelaoPage() {
     socket.on("connect",    () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
     socket.on("senhaChamada", s => {
-      setAtual(prev => { if (prev) setHist(h => [prev, ...h].slice(0, 5)); return s; });
-      flipCount.current += 1;
-      setFlipId(flipCount.current);
+      setChamadas(prev => {
+        // Cada atendente só tem uma chamada ativa por vez — se ele já
+        // tinha uma senha na tela, ela vira "anterior" e essa toma o lugar.
+        const idx = prev.findIndex(c => (c.atendente_id ?? null) === (s.atendente_id ?? null));
+        if (idx >= 0) {
+          setHist(h => [prev[idx], ...h].slice(0, 6));
+          const nova = [...prev];
+          nova[idx] = s;
+          return nova;
+        }
+        return [...prev, s];
+      });
+      if (somAtivo) tocarBeep(audioCtxRef.current);
     });
     socket.on("filaAtualizada", carregarFila);
     return () => socket.disconnect();
-  }, []);
+  }, [somAtivo]);
+
+  const tamanho = tamanhoPara(chamadas.length);
 
   return (
     <div style={{ minHeight: "100vh", background: P.bg, color: P.ink, fontFamily: P.fontDisplay,
@@ -185,18 +247,44 @@ export default function TelaoPage() {
             </span>
           </div>
         </div>
-        <span style={{ color: P.muted, fontSize: "clamp(15px,1.6vw,20px)", fontFamily: P.fontMono,
-          letterSpacing: "0.02em" }}>
-          {hora}
-        </span>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "18px" }}>
+          <button
+            onClick={ativarSom}
+            title={somAtivo ? "Som ativado" : "Clique pra ativar o som de chamada"}
+            style={{
+              display: "flex", alignItems: "center", gap: "8px", cursor: "pointer",
+              background: somAtivo ? "transparent" : P.amber, color: somAtivo ? P.muted : "#1a1204",
+              border: `1px solid ${somAtivo ? P.boardEdge : P.amber}`, borderRadius: "20px",
+              padding: "6px 14px", fontFamily: P.fontDisplay, fontWeight: 700,
+              fontSize: "clamp(11px,1vw,13px)", letterSpacing: "0.05em",
+            }}
+          >
+            {somAtivo ? "🔊 Som ativado" : "🔈 Ativar som"}
+          </button>
+          <span style={{ color: P.muted, fontSize: "clamp(15px,1.6vw,20px)", fontFamily: P.fontMono,
+            letterSpacing: "0.02em" }}>
+            {hora}
+          </span>
+        </div>
       </div>
 
       {/* Centro */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center",
         justifyContent: "center", padding: "40px", zIndex: 1 }}>
         <p style={{ margin: "0 0 26px", fontSize: "clamp(11px,1.1vw,14px)", letterSpacing: "0.4em",
-          color: P.mutedDim, textTransform: "uppercase" }}>Senha chamada</p>
-        <PainelSenha senha={atual} flipId={flipId} />
+          color: P.mutedDim, textTransform: "uppercase" }}>
+          {chamadas.length > 1 ? "Senhas chamadas" : "Senha chamada"}
+        </p>
+
+        {chamadas.length === 0 ? (
+          <PainelVazio />
+        ) : (
+          <div style={{ display: "flex", gap: `${40 * tamanho}px`, justifyContent: "center",
+            alignItems: "flex-start", flexWrap: "wrap", maxWidth: "1200px" }}>
+            {chamadas.map(c => <PainelSenha key={c.id} senha={c} size={tamanho} />)}
+          </div>
+        )}
       </div>
 
       {/* Próximas */}

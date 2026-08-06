@@ -445,7 +445,16 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
     if (!registro) return;
     try {
       const res = await fetch(`${API}/api/senha/status?numero=${encodeURIComponent(registro.numero)}&codigo=${encodeURIComponent(registro.codigoAcesso)}`);
-      if (!res.ok) return; // senha não existe mais (ex: fila resetada) — mantém tela anterior
+
+      if (res.status === 404) {
+        // Senha realmente não existe mais (ex: fila resetada pelo admin) — limpa o card.
+        localStorage.removeItem("visitante_ticket");
+        setTicketVisitante(null);
+        setTicketDados(null);
+        return;
+      }
+      if (!res.ok) return; // erro de rede/servidor — mantém a tela como estava, não é sinal de que a senha sumiu
+
       const data = await res.json();
       setTicketDados({ ...data, codigoAcesso: registro.codigoAcesso });
 
@@ -714,7 +723,7 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
               Ver painel ao vivo
             </Btn>
           </div>
-          <p style={{ fontSize: "12px", color: T.muted, margin: 0 }}>ⓘ Retirar senha sem login de forma rápida</p>
+          <p style={{ fontSize: "12px", color: T.muted, margin: 0 }}> Retirar senha sem login de forma rápida</p>
 
           {ticketVisitante && (
             <Card
@@ -949,8 +958,7 @@ function LandingCliente({ onGoogle, onLoginSuccess, avisoInicial }) {
       </div>
 
       <p style={{ textAlign: "center", color: T.muted, fontSize: "12px", padding: "20px", margin: 0 }}>
-        Retirada de Senhas · Sistema de atendimento online ·{" "}
-        <a href="/admin" style={{ color: T.muted }}>painel admin</a>
+        Retirada de Senhas · Sistema de atendimento online {" "}
       </p>
     </div>
   );

@@ -317,7 +317,14 @@ exports.chamarProxima = (atendenteId = null) => {
                         if (senha.tipo === "prioritario") contadorPrioritarias++;
                         else contadorPrioritarias = 0;
 
-                        resolve(senha);
+                        if (!atendenteId) return resolve(senha);
+
+                        // Busca o nome do atendente pra já mandar pronto pro telão
+                        // (evita o telão ter que dar outra volta na API só pra saber quem chamou).
+                        db.query(`SELECT nome FROM atendentes WHERE id = ?`, [atendenteId], (err, rows) => {
+                            senha.atendente_nome = err ? null : (rows[0]?.nome || null);
+                            resolve(senha);
+                        });
                     }
                 );
             });
@@ -505,23 +512,25 @@ exports.resetarFila = () => {
 exports.buscarFilaPublica = () => {
     return new Promise((resolve, reject) => {
         const sql = `
-            SELECT id, numero, tipo, status 
-            FROM senha 
-            WHERE status IN ('esperando', 'chamando')
-              AND dia_referencia = CURDATE()
-            ORDER BY 
-                CASE WHEN status = 'chamando' THEN 0 ELSE 1 END,
-                id ASC
+            SELECT s.id, s.numero, s.tipo, s.status, s.atendente_id, a.nome AS atendente_nome
+            FROM senha s
+            LEFT JOIN atendentes a ON a.id = s.atendente_id
+            WHERE s.status IN ('esperando', 'chamando')
+              AND s.dia_referencia = CURDATE()
+            ORDER BY
+                CASE WHEN s.status = 'chamando' THEN 0 ELSE 1 END,
+                s.id ASC
         `;
 
         db.query(sql, (err, result) => {
             if (err) return reject(err);
 
-            const chamando = result.find(s => s.status === 'chamando') || null;
+            const chamadas = result.filter(s => s.status === 'chamando');
             const fila = result.filter(s => s.status === 'esperando');
 
             resolve({
-                chamando,
+                chamadas,
+                chamando: chamadas[0] || null, // mantém compatibilidade com quem ainda usa o campo antigo
                 totalNaFila: fila.length,
                 fila
             });

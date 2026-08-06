@@ -9,8 +9,7 @@ exports.getTempo = async (req, res) => {
     }
 };
 
-// Ajuste manual pontual (ex: médico atrasado/adiantado hoje).
-// minutos = null/vazio remove o ajuste e volta ao cálculo automático.
+
 exports.setTempo = async (req, res) => {
     try {
         const { minutos } = req.body;
